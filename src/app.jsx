@@ -1055,7 +1055,7 @@ const globalCSS = `
     background: linear-gradient(135deg, rgba(79,195,247,0.25), rgba(124,77,255,0.25)) !important;
   }
   .sidebar-toggle:hover { background: #252545 !important; }
-  .zoom-btn:hover { background: rgba(79,195,247,0.15) !important; color: #4fc3f7 !important; }
+  .zoom-btn:hover { background: rgba(79,195,247,0.15) !important; color: #000000 !important; }
   .dropdown-item:hover {
     background: rgba(79,195,247,0.08) !important;
     color: rgba(255,255,255,0.95) !important;

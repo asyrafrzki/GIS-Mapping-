@@ -2,16 +2,24 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { MapContainer, TileLayer, GeoJSON, useMap, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+import { Bar } from 'react-chartjs-2';
 
-// ─── PERFORMANCE: Canvas renderer ────────────────────────────────────────────
+// ─── Register Chart.js components ────────────────────────────────────────────
+ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
+
+// ─── PERFORMANCE ─────────────────────────────────────────────────────────────
 const CANVAS_RENDERER = L.canvas({ padding: 0.5 });
-
-// ─── PERFORMANCE: In-memory GeoJSON cache ────────────────────────────────────
 const geoCache = new Map();
 
 // ─── 38 PROVINSI INDONESIA ───────────────────────────────────────────────────
-// dataKey: prefix nama file GeoJSON provinsi itu (misal 'JABAR' → JABAR_NITROGEN.json)
-// null = belum ada data, peta kosong saat provinsi ini dipilih
 const PROVINCES = [
   { name: 'Aceh',                    center: [4.695135, 96.749397],  zoom: 8,  dataKey: null },
   { name: 'Sumatera Utara',          center: [2.115, 99.543],        zoom: 8,  dataKey: null },
@@ -54,164 +62,213 @@ const PROVINCES = [
 ];
 
 // ─── NUTRIENT CONFIGS ────────────────────────────────────────────────────────
-// fileName sekarang adalah fungsi yang menerima dataKey provinsi
-// contoh: getFileName('JABAR') → 'JABAR_NITROGEN.json'
 const nutrientConfigs = {
   nitrogen: {
-    id: 'nitrogen',
-    filePrefix: 'NITROGEN',   // gabung: `${dataKey}_NITROGEN.json`
-    label: 'Nitrogen (N)',
-    symbol: 'N',
-    unit: 'ppm',
+    id: 'nitrogen', filePrefix: 'NITROGEN',
+    label: 'Nitrogen (N)', symbol: 'N', unit: 'ppm',
     description: 'Kandungan Nitrogen Tanah',
     gradient: ['#d0f0c0', '#a8d08d', '#5a9e4b', '#2d6a2e', '#0d3d0f'],
     levels: {
       1: { color: '#d0f0c0', label: 'Sangat Rendah', range: '< 0.1%' },
       2: { color: '#a8d08d', label: 'Rendah',        range: '0.1–0.2%' },
-      3: { color: '#5a9e4b', label: 'Sedang',         range: '0.2–0.5%' },
-      4: { color: '#2d6a2e', label: 'Tinggi',         range: '0.5–0.75%' },
-      5: { color: '#0d3d0f', label: 'Sangat Tinggi',  range: '> 0.75%' },
+      3: { color: '#5a9e4b', label: 'Sedang',        range: '0.2–0.5%' },
+      4: { color: '#2d6a2e', label: 'Tinggi',        range: '0.5–0.75%' },
+      5: { color: '#0d3d0f', label: 'Sangat Tinggi', range: '> 0.75%' },
       default: { color: '#2a2a3e', label: 'Tidak Ada Data', range: '-' },
     },
   },
   phosphor: {
-    id: 'phosphor',
-    filePrefix: 'PHOSPHOR',
-    label: 'Fosfor (P)',
-    symbol: 'P',
-    unit: 'mg/kg',
+    id: 'phosphor', filePrefix: 'PHOSPHOR',
+    label: 'Fosfor (P)', symbol: 'P', unit: 'mg/kg',
     description: 'Kandungan Fosfor Tanah',
     gradient: ['#fde8c8', '#f8c07a', '#f09030', '#c05010', '#7a2000'],
     levels: {
       1: { color: '#fde8c8', label: 'Sangat Rendah', range: '< 10' },
       2: { color: '#f8c07a', label: 'Rendah',        range: '10–25' },
-      3: { color: '#f09030', label: 'Sedang',         range: '25–50' },
-      4: { color: '#c05010', label: 'Tinggi',         range: '50–100' },
-      5: { color: '#7a2000', label: 'Sangat Tinggi',  range: '> 100' },
+      3: { color: '#f09030', label: 'Sedang',        range: '25–50' },
+      4: { color: '#c05010', label: 'Tinggi',        range: '50–100' },
+      5: { color: '#7a2000', label: 'Sangat Tinggi', range: '> 100' },
       default: { color: '#2a2a3e', label: 'Tidak Ada Data', range: '-' },
     },
   },
   kalium: {
-    id: 'kalium',
-    filePrefix: 'KALIUM',
-    label: 'Kalium (K)',
-    symbol: 'K',
-    unit: 'me/100g',
+    id: 'kalium', filePrefix: 'KALIUM',
+    label: 'Kalium (K)', symbol: 'K', unit: 'me/100g',
     description: 'Kandungan Kalium Tanah',
     gradient: ['#dce8ff', '#a0bcf0', '#5080d0', '#2040a0', '#0a1560'],
     levels: {
       1: { color: '#dce8ff', label: 'Sangat Rendah', range: '< 0.1' },
       2: { color: '#a0bcf0', label: 'Rendah',        range: '0.1–0.3' },
-      3: { color: '#5080d0', label: 'Sedang',         range: '0.3–0.5' },
-      4: { color: '#2040a0', label: 'Tinggi',         range: '0.5–1.0' },
-      5: { color: '#0a1560', label: 'Sangat Tinggi',  range: '> 1.0' },
+      3: { color: '#5080d0', label: 'Sedang',        range: '0.3–0.5' },
+      4: { color: '#2040a0', label: 'Tinggi',        range: '0.5–1.0' },
+      5: { color: '#0a1560', label: 'Sangat Tinggi', range: '> 1.0' },
       default: { color: '#2a2a3e', label: 'Tidak Ada Data', range: '-' },
     },
   },
   magnesium: {
-    id: 'magnesium',
-    filePrefix: 'MAGNESIUM',
-    label: 'Magnesium (Mg)',
-    symbol: 'Mg',
-    unit: 'me/100g',
+    id: 'magnesium', filePrefix: 'MAGNESIUM',
+    label: 'Magnesium (Mg)', symbol: 'Mg', unit: 'me/100g',
     description: 'Kandungan Magnesium Tanah',
     gradient: ['#f0e0ff', '#d0a0f0', '#a060d0', '#7030a0', '#400060'],
     levels: {
       1: { color: '#f0e0ff', label: 'Sangat Rendah', range: '< 0.3' },
       2: { color: '#d0a0f0', label: 'Rendah',        range: '0.3–0.6' },
-      3: { color: '#a060d0', label: 'Sedang',         range: '0.6–1.0' },
-      4: { color: '#7030a0', label: 'Tinggi',         range: '1.0–2.0' },
-      5: { color: '#400060', label: 'Sangat Tinggi',  range: '> 2.0' },
+      3: { color: '#a060d0', label: 'Sedang',        range: '0.6–1.0' },
+      4: { color: '#7030a0', label: 'Tinggi',        range: '1.0–2.0' },
+      5: { color: '#400060', label: 'Sangat Tinggi', range: '> 2.0' },
       default: { color: '#2a2a3e', label: 'Tidak Ada Data', range: '-' },
     },
   },
 };
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
 const getColor = (nutrientId, code) => {
   const cfg = nutrientConfigs[nutrientId];
   return (cfg.levels[code] || cfg.levels.default).color;
 };
 
-// ─── MAP CONTROLLER (zoom + fly + invalidateSize) ─────────────────────────────
+// ─── MAP CONTROLLER ───────────────────────────────────────────────────────────
 function MapController({ flyTarget, onFlyDone }) {
   const map = useMap();
-
   useEffect(() => {
     window.__soilMapRef = map;
-    // Paksa Leaflet recalculate ukuran container saat mount
     setTimeout(() => map.invalidateSize(), 100);
   }, [map]);
-
   useEffect(() => {
     if (flyTarget) {
       map.flyTo(flyTarget.center, flyTarget.zoom, { duration: 1.4 });
       onFlyDone();
     }
   }, [flyTarget]);
-
   return null;
+}
+
+// ─── CHART COMPONENT ─────────────────────────────────────────────────────────
+function NutrientChart({ stats, config, selectedLevel, onBarClick }) {
+  if (!config || !stats.total) return null;
+
+  const labels   = [1, 2, 3, 4, 5].map((n) => config.levels[n].label);
+  const counts   = [1, 2, 3, 4, 5].map((n) => stats.counts[n] || 0);
+  const pcts     = counts.map((c) => stats.total ? Math.round((c / stats.total) * 100) : 0);
+  const bgColors = [1, 2, 3, 4, 5].map((n) => {
+    const base = config.levels[n].color;
+    return selectedLevel === n ? base : base + 'aa';
+  });
+  const borderColors = [1, 2, 3, 4, 5].map((n) =>
+    selectedLevel === n ? '#ffffff55' : 'transparent'
+  );
+
+  const data = {
+    labels,
+    datasets: [{
+      label      : config.label,
+      data       : pcts,
+      backgroundColor : bgColors,
+      borderColor     : borderColors,
+      borderWidth     : 2,
+      borderRadius    : 5,
+      borderSkipped   : false,
+    }],
+  };
+
+  const options = {
+    responsive       : true,
+    maintainAspectRatio: false,
+    animation        : { duration: 500, easing: 'easeOutQuart' },
+    onClick          : (_, elements) => {
+      if (elements.length > 0) {
+        const idx = elements[0].index + 1; // gridcode 1-5
+        onBarClick(idx);
+      }
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor : 'rgba(13,13,30,0.95)',
+        borderColor     : 'rgba(255,255,255,0.12)',
+        borderWidth     : 1,
+        titleColor      : '#fff',
+        bodyColor       : 'rgba(255,255,255,0.7)',
+        padding         : 10,
+        callbacks: {
+          title : (items) => `Kelas ${items[0].dataIndex + 1} — ${labels[items[0].dataIndex]}`,
+          label : (item) => `${item.raw}%  (${counts[item.dataIndex].toLocaleString()} fitur)`,
+        },
+      },
+    },
+    scales: {
+      x: {
+        ticks: {
+          color    : 'rgba(255,255,255,0.4)',
+          font     : { size: 9, family: "'DM Mono', monospace" },
+          maxRotation: 30,
+        },
+        grid: { display: false },
+        border: { color: 'rgba(255,255,255,0.06)' },
+      },
+      y: {
+        ticks: {
+          color    : 'rgba(255,255,255,0.3)',
+          font     : { size: 9, family: "'DM Mono', monospace" },
+          callback : (v) => `${v}%`,
+          maxTicksLimit: 5,
+        },
+        grid  : { color: 'rgba(255,255,255,0.04)' },
+        border: { color: 'rgba(255,255,255,0.06)' },
+      },
+    },
+  };
+
+  return (
+    <div style={{ height: 140, marginTop: 4 }}>
+      <Bar data={data} options={options} />
+    </div>
+  );
 }
 
 // ─── MAIN APP ────────────────────────────────────────────────────────────────
 export default function App() {
-  // null = no nutrient selected (empty map)
   const [activeNutrient, setActiveNutrient] = useState(null);
   const [currentGeoData, setCurrentGeoData] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadError, setLoadError] = useState(null);
-  const [selectedLevel, setSelectedLevel] = useState(null);
-  const [userPosition, setUserPosition] = useState(null);
-  const [locStatus, setLocStatus] = useState('idle');
-  const [hoveredArea, setHoveredArea] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [mapStyle, setMapStyle] = useState('osm');
+  const [isLoading, setIsLoading]           = useState(false);
+  const [loadError, setLoadError]           = useState(null);
+  const [selectedLevel, setSelectedLevel]   = useState(null);
+  const [userPosition, setUserPosition]     = useState(null);
+  const [locStatus, setLocStatus]           = useState('idle');
+  const [hoveredArea, setHoveredArea]       = useState(null);
+  const [sidebarOpen, setSidebarOpen]       = useState(true);
+  const [mapStyle, setMapStyle]             = useState('osm');
+  const [showChart, setShowChart]           = useState(true);
 
-  // Province search state
-  const [provinceQuery, setProvinceQuery] = useState('');
-  const [showProvDropdown, setShowProvDropdown] = useState(false);
-  // Default province: Jawa Barat (punya dataKey)
-  const [selectedProvince, setSelectedProvince] = useState(
+  const [provinceQuery, setProvinceQuery]         = useState('');
+  const [showProvDropdown, setShowProvDropdown]   = useState(false);
+  const [selectedProvince, setSelectedProvince]   = useState(
     PROVINCES.find((p) => p.name === 'Jawa Barat')
   );
   const [flyTarget, setFlyTarget] = useState(null);
   const provSearchRef = useRef(null);
-
-  const geoJsonRef = useRef(null);
-  const abortRef = useRef(null);
+  const geoJsonRef    = useRef(null);
+  const abortRef      = useRef(null);
 
   const config = activeNutrient ? nutrientConfigs[activeNutrient] : null;
 
   // ─── Fetch GeoJSON ────────────────────────────────────────────────────────
-  // Fetch hanya jika: ada nutrisi dipilih DAN provinsi yang dipilih punya dataKey
   useEffect(() => {
     const dataKey = selectedProvince?.dataKey;
-
     if (!activeNutrient || !dataKey) {
-      // Tidak ada nutrisi dipilih, atau provinsi belum punya data → kosongkan peta
-      setCurrentGeoData(null);
-      setIsLoading(false);
-      setLoadError(null);
+      setCurrentGeoData(null); setIsLoading(false); setLoadError(null);
       return;
     }
-
     const { filePrefix } = nutrientConfigs[activeNutrient];
     const fileName = `${dataKey}_${filePrefix}.json`;
     const cacheKey = `${dataKey}_${activeNutrient}`;
 
     if (geoCache.has(cacheKey)) {
-      setCurrentGeoData(geoCache.get(cacheKey));
-      setIsLoading(false);
-      setLoadError(null);
+      setCurrentGeoData(geoCache.get(cacheKey)); setIsLoading(false); setLoadError(null);
       return;
     }
-
     if (abortRef.current) abortRef.current.abort();
     abortRef.current = new AbortController();
-
-    setIsLoading(true);
-    setLoadError(null);
-    setCurrentGeoData(null);
+    setIsLoading(true); setLoadError(null); setCurrentGeoData(null);
 
     fetch(`/${fileName}`, { signal: abortRef.current.signal })
       .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
@@ -223,40 +280,30 @@ export default function App() {
   }, [activeNutrient, selectedProvince]);
 
   // ─── Style function ───────────────────────────────────────────────────────
-  // Filter level sudah ditangani oleh prop `filter` di GeoJSON component,
-  // jadi style di sini hanya untuk feature yang memang di-render (selalu matched)
-  const styleGeoJson = useCallback(
-    (feature) => {
-      if (!activeNutrient) return { opacity: 0, fillOpacity: 0 };
-      const code = feature.properties.gridcode;
-      return {
-        fillColor: getColor(activeNutrient, code),
-        weight: 0.8,
-        opacity: 1,
-        color: 'rgba(0,0,0,0)',   // Tidak ada border
-        dashArray: '',
-        fillOpacity: 0.78,
-      };
-    },
-    [activeNutrient]
-  );
-
-  // ─── Re-style without remounting ─────────────────────────────────────────
-  // Tidak perlu lagi — filter level sudah re-mount via key change
-  // (key mengandung selectedLevel sehingga GeoJSON akan re-render otomatis)
+  const styleGeoJson = useCallback((feature) => {
+    if (!activeNutrient) return { opacity: 0, fillOpacity: 0 };
+    const code = feature.properties.gridcode;
+    return {
+      fillColor : getColor(activeNutrient, code),
+      weight    : 0.8,
+      opacity   : 1,
+      color     : 'rgba(0,0,0,0)',
+      dashArray : '',
+      fillOpacity: 0.78,
+    };
+  }, [activeNutrient]);
 
   // ─── Preload on hover ─────────────────────────────────────────────────────
   const preloadNutrient = useCallback((nutrientId) => {
     const dataKey = selectedProvince?.dataKey;
-    if (!dataKey) return; // provinsi tidak punya data, skip preload
+    if (!dataKey) return;
     const cacheKey = `${dataKey}_${nutrientId}`;
     if (geoCache.has(cacheKey)) return;
     const { filePrefix } = nutrientConfigs[nutrientId];
-    const fileName = `${dataKey}_${filePrefix}.json`;
-    fetch(`/${fileName}`).then((r) => r.json()).then((data) => geoCache.set(cacheKey, data)).catch(() => {});
+    fetch(`/${dataKey}_${filePrefix}.json`).then((r) => r.json()).then((d) => geoCache.set(cacheKey, d)).catch(() => {});
   }, [selectedProvince]);
 
-  // ─── Stats ────────────────────────────────────────────────────────────────
+  // ─── Stats (untuk chart & legend) ────────────────────────────────────────
   const stats = useMemo(() => {
     if (!currentGeoData) return { counts: {}, total: 0 };
     const counts = {};
@@ -267,48 +314,53 @@ export default function App() {
     return { counts, total: currentGeoData.features.length };
   }, [currentGeoData]);
 
+  // ─── Dominant class dari stats ────────────────────────────────────────────
+  const dominantClass = useMemo(() => {
+    if (!stats.total) return null;
+    const entry = Object.entries(stats.counts).sort((a, b) => b[1] - a[1])[0];
+    if (!entry) return null;
+    return { code: parseInt(entry[0]), count: entry[1] };
+  }, [stats]);
+
   // ─── onEachFeature ────────────────────────────────────────────────────────
-  const onEachFeature = useCallback(
-    (feature, layer) => {
-      if (!activeNutrient || !config) return;
-      const code = feature.properties.gridcode;
-      const cfg = config.levels[code] || config.levels.default;
-      const area = feature.properties.KABUPATEN || feature.properties.nama_wilayah || 'Wilayah';
-      const isDark = code >= 4;
+  const onEachFeature = useCallback((feature, layer) => {
+    if (!activeNutrient || !config) return;
+    const code = feature.properties.gridcode;
+    const cfg  = config.levels[code] || config.levels.default;
+    const area = feature.properties.KABUPATEN || feature.properties.nama_wilayah || 'Wilayah';
+    const isDark = code >= 4;
 
-      layer.bindPopup(() => {
-        const div = document.createElement('div');
-        div.style.cssText = "font-family:'Space Grotesk',sans-serif;min-width:190px;padding:4px;";
-        div.innerHTML = `
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#888;margin-bottom:4px;">${config.description}</div>
-          <div style="font-size:16px;font-weight:700;color:#1a1a2e;margin-bottom:10px;">${area}</div>
-          <div style="background:${cfg.color};color:${isDark ? '#fff' : '#1a1a2e'};padding:8px 12px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-weight:600;font-size:13px;">${cfg.label}</span>
-            <span style="font-size:11px;opacity:0.8;">Kelas ${code}</span>
-          </div>
-          <div style="margin-top:8px;font-size:12px;color:#666;">Rentang: <strong>${cfg.range} ${config.unit}</strong></div>
-        `;
-        return div;
-      }, { maxWidth: 240 });
+    layer.bindPopup(() => {
+      const div = document.createElement('div');
+      div.style.cssText = "font-family:'Space Grotesk',sans-serif;min-width:190px;padding:4px;";
+      div.innerHTML = `
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#888;margin-bottom:4px;">${config.description}</div>
+        <div style="font-size:16px;font-weight:700;color:#1a1a2e;margin-bottom:10px;">${area}</div>
+        <div style="background:${cfg.color};color:${isDark ? '#fff' : '#1a1a2e'};padding:8px 12px;border-radius:8px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:600;font-size:13px;">${cfg.label}</span>
+          <span style="font-size:11px;opacity:0.8;">Kelas ${code}</span>
+        </div>
+        <div style="margin-top:8px;font-size:12px;color:#666;">Rentang: <strong>${cfg.range} ${config.unit}</strong></div>
+      `;
+      return div;
+    }, { maxWidth: 240 });
 
-      layer.on({
-        mouseover: (e) => {
-          e.target.setStyle({ weight: 2, color: 'rgba(255,255,255,0.6)', fillOpacity: 0.95 });
-          setHoveredArea({ name: area, code, cfg });
-        },
-        mouseout: (e) => {
-          if (geoJsonRef.current) geoJsonRef.current.resetStyle(e.target);
-          setHoveredArea(null);
-        },
-      });
-    },
-    [config, activeNutrient]
-  );
+    layer.on({
+      mouseover: (e) => {
+        e.target.setStyle({ weight: 2, color: 'rgba(255,255,255,0.6)', fillOpacity: 0.95 });
+        setHoveredArea({ name: area, code, cfg });
+      },
+      mouseout: (e) => {
+        if (geoJsonRef.current) geoJsonRef.current.resetStyle(e.target);
+        setHoveredArea(null);
+      },
+    });
+  }, [config, activeNutrient]);
 
   // ─── Tile layers ──────────────────────────────────────────────────────────
   const tileLayers = {
-    osm: { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', attr: '© OpenStreetMap', filter: 'brightness(0.6) saturate(0.4)' },
-    topo: { url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', attr: '© OpenTopoMap', filter: 'brightness(0.7)' },
+    osm      : { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',       attr: '© OpenStreetMap', filter: 'brightness(0.6) saturate(0.4)' },
+    topo     : { url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',         attr: '© OpenTopoMap',   filter: 'brightness(0.7)' },
     satellite: { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr: '© ESRI', filter: 'brightness(0.8) saturate(0.7)' },
   };
 
@@ -336,22 +388,15 @@ export default function App() {
 
   // ─── Nutrient change ──────────────────────────────────────────────────────
   const handleNutrientChange = (id) => {
-    if (activeNutrient === id) {
-      // Clicking same → deselect (empty map)
-      setActiveNutrient(null);
-      setCurrentGeoData(null);
-    } else {
-      setActiveNutrient(id);
-    }
+    setActiveNutrient(activeNutrient === id ? null : id);
+    if (activeNutrient === id) setCurrentGeoData(null);
     setSelectedLevel(null);
   };
 
   // ─── Province search ──────────────────────────────────────────────────────
   const filteredProvinces = useMemo(() => {
     if (!provinceQuery.trim()) return PROVINCES;
-    return PROVINCES.filter((p) =>
-      p.name.toLowerCase().includes(provinceQuery.toLowerCase())
-    );
+    return PROVINCES.filter((p) => p.name.toLowerCase().includes(provinceQuery.toLowerCase()));
   }, [provinceQuery]);
 
   const handleProvinceSelect = (prov) => {
@@ -359,26 +404,19 @@ export default function App() {
     setProvinceQuery(prov.name);
     setShowProvDropdown(false);
     setFlyTarget({ center: prov.center, zoom: prov.zoom });
-    // Reset nutrisi & data saat ganti provinsi
-    // (data GeoJSON-nya berbeda per provinsi)
-    setActiveNutrient(null);
-    setCurrentGeoData(null);
-    setSelectedLevel(null);
+    setActiveNutrient(null); setCurrentGeoData(null); setSelectedLevel(null);
   };
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handleClick = (e) => {
-      if (provSearchRef.current && !provSearchRef.current.contains(e.target)) {
+      if (provSearchRef.current && !provSearchRef.current.contains(e.target))
         setShowProvDropdown(false);
-      }
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  // ─── Zoom controls ────────────────────────────────────────────────────────
-  const zoomIn = () => { if (window.__soilMapRef) window.__soilMapRef.zoomIn(); };
+  const zoomIn  = () => { if (window.__soilMapRef) window.__soilMapRef.zoomIn(); };
   const zoomOut = () => { if (window.__soilMapRef) window.__soilMapRef.zoomOut(); };
 
   // ─── RENDER ───────────────────────────────────────────────────────────────
@@ -420,40 +458,31 @@ export default function App() {
                 style={styles.searchInput}
               />
               {provinceQuery && (
-                <button
-                  onClick={() => { setProvinceQuery(''); setSelectedProvince(null); setShowProvDropdown(false); }}
-                  style={styles.searchClear}
-                >✕</button>
+                <button onClick={() => { setProvinceQuery(''); setSelectedProvince(null); setShowProvDropdown(false); }} style={styles.searchClear}>✕</button>
               )}
             </div>
 
             {showProvDropdown && (
               <div style={styles.dropdown}>
-                {filteredProvinces.length === 0 ? (
-                  <div style={styles.dropdownEmpty}>Provinsi tidak ditemukan</div>
-                ) : (
-                  filteredProvinces.map((prov) => (
+                {filteredProvinces.length === 0
+                  ? <div style={styles.dropdownEmpty}>Provinsi tidak ditemukan</div>
+                  : filteredProvinces.map((prov) => (
                     <div
                       key={prov.name}
                       onClick={() => handleProvinceSelect(prov)}
-                      style={{
-                        ...styles.dropdownItem,
-                        ...(selectedProvince?.name === prov.name ? styles.dropdownItemActive : {}),
-                      }}
+                      style={{ ...styles.dropdownItem, ...(selectedProvince?.name === prov.name ? styles.dropdownItemActive : {}) }}
                       className="dropdown-item"
                     >
                       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'rgba(255,255,255,0.3)', flexShrink: 0 }}>
                         <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" /><circle cx="12" cy="10" r="3" />
                       </svg>
                       <span style={{ flex: 1 }}>{prov.name}</span>
-                      {prov.dataKey ? (
-                        <span style={styles.dataBadgeAvail}>● data</span>
-                      ) : (
-                        <span style={styles.dataBadgeNone}>belum ada</span>
-                      )}
+                      {prov.dataKey
+                        ? <span style={styles.dataBadgeAvail}>● data</span>
+                        : <span style={styles.dataBadgeNone}>belum ada</span>}
                     </div>
                   ))
-                )}
+                }
               </div>
             )}
           </div>
@@ -472,7 +501,6 @@ export default function App() {
             )}
           </div>
 
-          {/* Peringatan jika provinsi belum punya data */}
           {selectedProvince && !selectedProvince.dataKey && (
             <div style={styles.noDataNotice}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
@@ -488,16 +516,13 @@ export default function App() {
                 key={n.id}
                 onClick={() => handleNutrientChange(n.id)}
                 onMouseEnter={() => preloadNutrient(n.id)}
-                style={{
-                  ...styles.nutrientBtn,
-                  ...(activeNutrient === n.id ? styles.nutrientBtnActive : {}),
-                }}
+                style={{ ...styles.nutrientBtn, ...(activeNutrient === n.id ? styles.nutrientBtnActive : {}) }}
                 className="nutrient-btn"
               >
                 <span style={{
                   ...styles.nutrientSymbol,
                   background: activeNutrient === n.id ? n.gradient[2] : 'rgba(255,255,255,0.05)',
-                  color: activeNutrient === n.id ? '#fff' : 'rgba(255,255,255,0.5)',
+                  color     : activeNutrient === n.id ? '#fff' : 'rgba(255,255,255,0.5)',
                 }}>
                   {n.symbol}
                 </span>
@@ -505,6 +530,57 @@ export default function App() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div style={styles.divider} />
+
+        {/* ── Chart Distribusi ── */}
+        <div style={styles.section}>
+          <div style={styles.legendHeader}>
+            <label style={styles.sectionLabel}>DISTRIBUSI KELAS</label>
+            {activeNutrient && stats.total > 0 && (
+              <button
+                onClick={() => setShowChart(!showChart)}
+                style={styles.chartToggleBtn}
+                className="reset-btn"
+              >
+                {showChart ? '▾ Sembunyikan' : '▸ Tampilkan'}
+              </button>
+            )}
+          </div>
+
+          {!activeNutrient || !stats.total ? (
+            <div style={styles.emptyLegend}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: 'rgba(255,255,255,0.15)', marginBottom: 8 }}>
+                <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
+              </svg>
+              <span>Pilih parameter nutrisi<br />untuk melihat chart</span>
+            </div>
+          ) : showChart ? (
+            <>
+              {/* Dominant class badge */}
+              {dominantClass && (
+                <div style={styles.dominantBadge}>
+                  <span style={{ ...styles.dominantDot, background: config.levels[dominantClass.code]?.color }} />
+                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Dominan:</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#fff' }}>
+                    Kelas {dominantClass.code} — {config.levels[dominantClass.code]?.label}
+                  </span>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', fontFamily: "'DM Mono', monospace", marginLeft: 'auto' }}>
+                    {Math.round((dominantClass.count / stats.total) * 100)}%
+                  </span>
+                </div>
+              )}
+              {/* Chart */}
+              <NutrientChart
+                stats={stats}
+                config={config}
+                selectedLevel={selectedLevel}
+                onBarClick={(idx) => setSelectedLevel(selectedLevel === idx ? null : idx)}
+              />
+              <div style={styles.chartHint}>Klik bar untuk filter peta per kelas</div>
+            </>
+          ) : null}
         </div>
 
         <div style={styles.divider} />
@@ -530,9 +606,9 @@ export default function App() {
           ) : (
             <div style={styles.legendList}>
               {[1, 2, 3, 4, 5].map((num) => {
-                const lvl = config.levels[num];
-                const count = stats.counts[num] || 0;
-                const pct = stats.total ? Math.round((count / stats.total) * 100) : 0;
+                const lvl    = config.levels[num];
+                const count  = stats.counts[num] || 0;
+                const pct    = stats.total ? Math.round((count / stats.total) * 100) : 0;
                 const isActive = selectedLevel === num;
 
                 return (
@@ -546,10 +622,10 @@ export default function App() {
                       <div style={{
                         width: 28, height: 28, borderRadius: 6,
                         background: lvl.color,
-                        border: isActive ? '2px solid rgba(255,255,255,0.5)' : '1px solid rgba(255,255,255,0.1)',
-                        flexShrink: 0,
-                        boxShadow: isActive ? `0 0 12px ${lvl.color}80` : 'none',
-                        transition: 'all 0.2s',
+                        border     : isActive ? '2px solid rgba(255,255,255,0.5)' : '1px solid rgba(255,255,255,0.1)',
+                        flexShrink : 0,
+                        boxShadow  : isActive ? `0 0 12px ${lvl.color}80` : 'none',
+                        transition : 'all 0.2s',
                       }} />
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 600, color: isActive ? '#fff' : 'rgba(255,255,255,0.8)' }}>
@@ -582,8 +658,8 @@ export default function App() {
           <label style={styles.sectionLabel}>BASEMAP</label>
           <div style={styles.mapStyleRow}>
             {[
-              { id: 'osm', icon: '🗺️', label: 'Default' },
-              { id: 'topo', icon: '⛰️', label: 'Topo' },
+              { id: 'osm',       icon: '🗺️', label: 'Default' },
+              { id: 'topo',      icon: '⛰️', label: 'Topo' },
               { id: 'satellite', icon: '🛰️', label: 'Satelit' },
             ].map((ms) => (
               <button key={ms.id} onClick={() => setMapStyle(ms.id)}
@@ -644,7 +720,7 @@ export default function App() {
         {sidebarOpen ? '‹' : '›'}
       </button>
 
-      {/* ── MAP (full screen, sidebar overlays on top) ── */}
+      {/* ── MAP ── */}
       <main style={styles.mapContainer}>
         <MapContainer
           center={[-6.9175, 107.6191]}
@@ -654,7 +730,6 @@ export default function App() {
           preferCanvas={true}
         >
           <TileLayer key={mapStyle} url={tileLayers[mapStyle].url} attribution={tileLayers[mapStyle].attr} />
-
           <MapController flyTarget={flyTarget} onFlyDone={() => setFlyTarget(null)} />
 
           {currentGeoData && activeNutrient && (
@@ -666,12 +741,8 @@ export default function App() {
               onEachFeature={onEachFeature}
               renderer={CANVAS_RENDERER}
               filter={(f) => {
-                // Selalu skip Point geometry
                 if (f.geometry.type === 'Point') return false;
-                // Kalau ada filter level aktif, hanya render feature yang matched
-                if (selectedLevel !== null) {
-                  return Number(f.properties.gridcode) === selectedLevel;
-                }
+                if (selectedLevel !== null) return Number(f.properties.gridcode) === selectedLevel;
                 return true;
               }}
             />
@@ -693,9 +764,7 @@ export default function App() {
           <div style={styles.loadingOverlay}>
             <div style={styles.loadingCard}>
               <span style={styles.loadingSpinner} />
-              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
-                Memuat data {config?.label}...
-              </span>
+              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>Memuat data {config?.label}...</span>
             </div>
           </div>
         )}
@@ -736,7 +805,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Zoom Controls — directly call map methods */}
+        {/* Zoom Controls */}
         <div style={styles.zoomControls}>
           <button className="zoom-btn" style={styles.zoomBtn} onClick={zoomIn}>+</button>
           <button className="zoom-btn" style={{ ...styles.zoomBtn, borderTop: '1px solid rgba(255,255,255,0.1)' }} onClick={zoomOut}>−</button>
@@ -754,7 +823,6 @@ const styles = {
     background: '#0d0d1a', position: 'relative',
   },
   sidebar: {
-    // Sidebar sebagai overlay absolute — tidak mempengaruhi lebar map
     position: 'absolute', top: 0, left: 0,
     width: 320, height: '100%',
     background: 'linear-gradient(180deg, #111128 0%, #0d0d1e 100%)',
@@ -764,172 +832,123 @@ const styles = {
     transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     zIndex: 1000,
   },
-  sidebarHeader: {
-    padding: '24px 20px 16px',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
-  },
-  logoRow: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 },
-  logoIcon: {
+  sidebarHeader: { padding: '24px 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.06)' },
+  logoRow       : { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 },
+  logoIcon      : {
     width: 32, height: 32,
     background: 'linear-gradient(135deg, #4fc3f7, #7c4dff)',
     borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
     color: '#fff', flexShrink: 0,
   },
-  logoText: { fontSize: 20, fontWeight: 700, color: '#fff', letterSpacing: '-0.5px' },
-  logoBadge: {
+  logoText     : { fontSize: 20, fontWeight: 700, color: '#fff', letterSpacing: '-0.5px' },
+  logoBadge    : {
     fontSize: 9, fontWeight: 700,
     background: 'linear-gradient(135deg, #4fc3f780, #7c4dff80)',
-    color: '#a8d8ff',
-    border: '1px solid rgba(79,195,247,0.3)',
+    color: '#a8d8ff', border: '1px solid rgba(79,195,247,0.3)',
     padding: '2px 7px', borderRadius: 20,
     letterSpacing: 2, fontFamily: "'DM Mono', monospace",
   },
   sidebarSubtitle: { fontSize: 11, color: 'rgba(255,255,255,0.35)', margin: 0, letterSpacing: 0.3 },
-  section: { padding: '16px 20px' },
-  sectionLabel: {
+  section        : { padding: '16px 20px' },
+  sectionLabel   : {
     display: 'block', fontSize: 10, fontWeight: 700,
     color: 'rgba(255,255,255,0.3)', letterSpacing: 2, marginBottom: 12,
     fontFamily: "'DM Mono', monospace",
   },
-
-  // Province search
   searchBox: {
     display: 'flex', alignItems: 'center', gap: 8,
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 10, padding: '9px 12px',
-    transition: 'border-color 0.2s',
+    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 10, padding: '9px 12px', transition: 'border-color 0.2s',
   },
-  searchInput: {
-    flex: 1, background: 'none', border: 'none', outline: 'none',
-    color: '#fff', fontSize: 13,
-    fontFamily: "'Space Grotesk', sans-serif",
-  },
-  searchClear: {
-    background: 'none', border: 'none', cursor: 'pointer',
-    color: 'rgba(255,255,255,0.3)', fontSize: 12, padding: '0 2px',
-    lineHeight: 1, flexShrink: 0,
-  },
-  dropdown: {
+  searchInput: { flex: 1, background: 'none', border: 'none', outline: 'none', color: '#fff', fontSize: 13, fontFamily: "'Space Grotesk', sans-serif" },
+  searchClear : { background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', fontSize: 12, padding: '0 2px', lineHeight: 1, flexShrink: 0 },
+  dropdown    : {
     position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
-    background: '#1a1a35',
-    border: '1px solid rgba(255,255,255,0.1)',
-    borderRadius: 10, zIndex: 9999,
-    maxHeight: 220, overflowY: 'auto',
-    boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
-    scrollbarWidth: 'thin',
+    background: '#1a1a35', border: '1px solid rgba(255,255,255,0.1)',
+    borderRadius: 10, zIndex: 9999, maxHeight: 220, overflowY: 'auto',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.5)', scrollbarWidth: 'thin',
   },
-  dropdownItem: {
-    display: 'flex', alignItems: 'center', gap: 8,
-    padding: '9px 14px', cursor: 'pointer',
-    fontSize: 13, color: 'rgba(255,255,255,0.7)',
-    transition: 'all 0.15s',
-    borderBottom: '1px solid rgba(255,255,255,0.04)',
-  },
-  dropdownItemActive: {
-    background: 'rgba(79,195,247,0.12)', color: '#4fc3f7',
-  },
-  dropdownEmpty: {
-    padding: '12px 14px', fontSize: 12,
-    color: 'rgba(255,255,255,0.3)', textAlign: 'center',
-  },
-  dataBadgeAvail: {
-    fontSize: 10, padding: '2px 6px',
-    background: 'rgba(76,175,80,0.15)',
-    border: '1px solid rgba(76,175,80,0.3)',
-    color: '#81c784', borderRadius: 10,
-    fontFamily: "'DM Mono', monospace",
-    flexShrink: 0,
-  },
-  dataBadgeNone: {
-    fontSize: 10, padding: '2px 6px',
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    color: 'rgba(255,255,255,0.25)', borderRadius: 10,
-    fontFamily: "'DM Mono', monospace",
-    flexShrink: 0,
-  },
+  dropdownItem      : { display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', cursor: 'pointer', fontSize: 13, color: 'rgba(255,255,255,0.7)', transition: 'all 0.15s', borderBottom: '1px solid rgba(255,255,255,0.04)' },
+  dropdownItemActive: { background: 'rgba(79,195,247,0.12)', color: '#4fc3f7' },
+  dropdownEmpty     : { padding: '12px 14px', fontSize: 12, color: 'rgba(255,255,255,0.3)', textAlign: 'center' },
+  dataBadgeAvail    : { fontSize: 10, padding: '2px 6px', background: 'rgba(76,175,80,0.15)', border: '1px solid rgba(76,175,80,0.3)', color: '#81c784', borderRadius: 10, fontFamily: "'DM Mono', monospace", flexShrink: 0 },
+  dataBadgeNone     : { fontSize: 10, padding: '2px 6px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.25)', borderRadius: 10, fontFamily: "'DM Mono', monospace", flexShrink: 0 },
   noDataNotice: {
     display: 'flex', alignItems: 'flex-start', gap: 8,
     padding: '10px 12px', marginBottom: 12,
-    background: 'rgba(255,180,0,0.08)',
-    border: '1px solid rgba(255,180,0,0.2)',
-    borderRadius: 8,
-    fontSize: 12, color: 'rgba(255,200,80,0.85)',
-    lineHeight: 1.5,
+    background: 'rgba(255,180,0,0.08)', border: '1px solid rgba(255,180,0,0.2)',
+    borderRadius: 8, fontSize: 12, color: 'rgba(255,200,80,0.85)', lineHeight: 1.5,
   },
-
   emptyLegend: {
     display: 'flex', flexDirection: 'column', alignItems: 'center',
-    padding: '24px 0', fontSize: 12,
-    color: 'rgba(255,255,255,0.2)', textAlign: 'center', lineHeight: 1.7,
+    padding: '20px 0', fontSize: 12, color: 'rgba(255,255,255,0.2)', textAlign: 'center', lineHeight: 1.7,
   },
-
-  nutrientGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 },
-  nutrientBtn: {
+  nutrientGrid  : { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 },
+  nutrientBtn   : {
     display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)',
+    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
     borderRadius: 10, cursor: 'pointer', transition: 'all 0.2s ease', textAlign: 'left',
   },
-  nutrientBtnActive: {
-    background: 'rgba(79,195,247,0.1)',
-    border: '1px solid rgba(79,195,247,0.3)',
-  },
-  nutrientSymbol: {
+  nutrientBtnActive: { background: 'rgba(79,195,247,0.1)', border: '1px solid rgba(79,195,247,0.3)' },
+  nutrientSymbol   : {
     width: 28, height: 28, borderRadius: 6,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: 12, fontWeight: 700, fontFamily: "'DM Mono', monospace",
     flexShrink: 0, transition: 'all 0.2s',
   },
   nutrientName: { fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.7)', lineHeight: 1.2 },
-  divider: { height: 1, background: 'rgba(255,255,255,0.05)', margin: '0 20px' },
+  divider     : { height: 1, background: 'rgba(255,255,255,0.05)', margin: '0 20px' },
   legendHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  resetBtn: {
+  resetBtn    : {
     fontSize: 11, padding: '3px 9px',
-    background: 'rgba(255,100,100,0.15)',
-    border: '1px solid rgba(255,100,100,0.3)',
-    borderRadius: 20, cursor: 'pointer',
-    color: 'rgba(255,160,160,0.9)',
+    background: 'rgba(255,100,100,0.15)', border: '1px solid rgba(255,100,100,0.3)',
+    borderRadius: 20, cursor: 'pointer', color: 'rgba(255,160,160,0.9)',
     fontFamily: "'DM Mono', monospace", transition: 'all 0.2s',
   },
-  legendList: { display: 'flex', flexDirection: 'column', gap: 6 },
-  legendItem: {
+  chartToggleBtn: {
+    fontSize: 11, padding: '3px 9px',
+    background: 'rgba(79,195,247,0.1)', border: '1px solid rgba(79,195,247,0.25)',
+    borderRadius: 20, cursor: 'pointer', color: 'rgba(79,195,247,0.9)',
+    fontFamily: "'DM Mono', monospace", transition: 'all 0.2s',
+  },
+
+  // ── Chart styles ──────────────────────────────────────────────────────────
+  dominantBadge: {
+    display: 'flex', alignItems: 'center', gap: 6,
+    padding: '7px 10px', marginBottom: 10,
+    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
+    borderRadius: 8,
+  },
+  dominantDot: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0 },
+  chartHint  : {
+    marginTop: 6, fontSize: 9, color: 'rgba(255,255,255,0.2)',
+    textAlign: 'center', letterSpacing: 0.3,
+  },
+
+  legendList    : { display: 'flex', flexDirection: 'column', gap: 6 },
+  legendItem    : {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '10px 12px',
-    background: 'rgba(255,255,255,0.03)',
+    padding: '10px 12px', background: 'rgba(255,255,255,0.03)',
     border: '1px solid rgba(255,255,255,0.06)',
     borderRadius: 10, cursor: 'pointer', transition: 'all 0.2s ease',
   },
-  legendItemActive: {
-    background: 'rgba(255,255,255,0.08)',
-    border: '1px solid rgba(255,255,255,0.15)',
+  legendItemActive: { background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)' },
+  mapStyleRow     : { display: 'flex', gap: 8 },
+  mapStyleBtn     : {
+    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '10px 6px',
+    background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 10, cursor: 'pointer', color: 'rgba(255,255,255,0.5)', transition: 'all 0.2s',
   },
-  mapStyleRow: { display: 'flex', gap: 8 },
-  mapStyleBtn: {
-    flex: 1, display: 'flex', flexDirection: 'column',
-    alignItems: 'center', gap: 4, padding: '10px 6px',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 10, cursor: 'pointer',
-    color: 'rgba(255,255,255,0.5)', transition: 'all 0.2s',
-  },
-  mapStyleBtnActive: {
-    background: 'rgba(79,195,247,0.1)',
-    border: '1px solid rgba(79,195,247,0.35)', color: '#4fc3f7',
-  },
-  locateBtn: {
-    width: '100%', padding: '12px',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  mapStyleBtnActive: { background: 'rgba(79,195,247,0.1)', border: '1px solid rgba(79,195,247,0.35)', color: '#4fc3f7' },
+  locateBtn        : {
+    width: '100%', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center',
     background: 'linear-gradient(135deg, rgba(79,195,247,0.15), rgba(124,77,255,0.15))',
-    border: '1px solid rgba(79,195,247,0.3)',
-    borderRadius: 10, cursor: 'pointer',
-    color: '#4fc3f7', fontSize: 13, fontWeight: 600,
-    transition: 'all 0.2s', letterSpacing: 0.3,
+    border: '1px solid rgba(79,195,247,0.3)', borderRadius: 10, cursor: 'pointer',
+    color: '#4fc3f7', fontSize: 13, fontWeight: 600, transition: 'all 0.2s', letterSpacing: 0.3,
   },
   locateBtnSuccess: { background: 'rgba(76,175,80,0.15)', border: '1px solid rgba(76,175,80,0.4)', color: '#81c784' },
-  locateBtnError: { background: 'rgba(244,67,54,0.15)', border: '1px solid rgba(244,67,54,0.4)', color: '#e57373' },
-  spinner: {
+  locateBtnError  : { background: 'rgba(244,67,54,0.15)', border: '1px solid rgba(244,67,54,0.4)', color: '#e57373' },
+  spinner         : {
     width: 12, height: 12,
     border: '2px solid rgba(79,195,247,0.3)', borderTop: '2px solid #4fc3f7',
     borderRadius: '50%', display: 'inline-block',
@@ -937,151 +956,87 @@ const styles = {
   },
   hoverCard: {
     margin: '0 20px 16px', padding: '12px 14px',
-    background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
     borderRadius: 10, display: 'flex', alignItems: 'center', gap: 12,
     animation: 'fadeIn 0.2s ease',
   },
-  hoverCardDot: (color) => ({
-    width: 10, height: 10, borderRadius: '50%',
-    background: color, flexShrink: 0, boxShadow: `0 0 8px ${color}`,
-  }),
-  sidebarFooter: { marginTop: 'auto', padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,0.05)' },
-  sidebarToggle: {
-    position: 'absolute',
-    // Saat open: tepat di kanan sidebar (320px). Saat closed: di kiri layar (0px)
-    top: '50%', transform: 'translateY(-50%)',
-    zIndex: 1001,
-    width: 28, height: 52,
-    background: '#1a1a35',
-    border: '1px solid rgba(255,255,255,0.12)',
-    borderLeft: 'none',
-    borderRadius: '0 8px 8px 0',
-    cursor: 'pointer',
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 18, fontWeight: 300,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    boxShadow: '4px 0 16px rgba(0,0,0,0.4)',
+  hoverCardDot: (color) => ({ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0, boxShadow: `0 0 8px ${color}` }),
+  sidebarFooter   : { marginTop: 'auto', padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,0.05)' },
+  sidebarToggle   : {
+    position: 'absolute', top: '50%', transform: 'translateY(-50%)',
+    zIndex: 1001, width: 28, height: 52,
+    background: '#1a1a35', border: '1px solid rgba(255,255,255,0.12)', borderLeft: 'none',
+    borderRadius: '0 8px 8px 0', cursor: 'pointer', color: 'rgba(255,255,255,0.7)',
+    fontSize: 18, fontWeight: 300, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    transition: 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)', boxShadow: '4px 0 16px rgba(0,0,0,0.4)',
   },
-  mapContainer: {
-    // Map selalu full viewport — sidebar overlay di atasnya
-    position: 'absolute', top: 0, left: 0,
-    width: '100%', height: '100%', overflow: 'hidden',
-  },
-  loadingOverlay: {
-    position: 'absolute', bottom: 80, left: '50%',
-    transform: 'translateX(-50%)', zIndex: 999, pointerEvents: 'none',
-  },
-  loadingCard: {
+  mapContainer: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', overflow: 'hidden' },
+  loadingOverlay  : { position: 'absolute', bottom: 80, left: '50%', transform: 'translateX(-50%)', zIndex: 999, pointerEvents: 'none' },
+  loadingCard     : {
     background: 'rgba(13,13,30,0.9)', backdropFilter: 'blur(12px)',
-    border: '1px solid rgba(255,255,255,0.12)',
-    borderRadius: 24, padding: '10px 20px',
+    border: '1px solid rgba(255,255,255,0.12)', borderRadius: 24, padding: '10px 20px',
     display: 'flex', alignItems: 'center', gap: 10,
     boxShadow: '0 4px 24px rgba(0,0,0,0.4)', whiteSpace: 'nowrap',
   },
   loadingSpinner: {
     width: 14, height: 14,
     border: '2px solid rgba(79,195,247,0.3)', borderTop: '2px solid #4fc3f7',
-    borderRadius: '50%', display: 'inline-block',
-    animation: 'spin 0.8s linear infinite',
+    borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite',
   },
   mapBadge: {
-    position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)',
-    zIndex: 999,
+    position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)', zIndex: 999,
     background: 'rgba(13,13,30,0.85)', backdropFilter: 'blur(12px)',
-    border: '1px solid rgba(255,255,255,0.12)',
-    borderRadius: 24, padding: '8px 18px',
+    border: '1px solid rgba(255,255,255,0.12)', borderRadius: 24, padding: '8px 18px',
     fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)',
     display: 'flex', alignItems: 'center', gap: 8,
     boxShadow: '0 4px 24px rgba(0,0,0,0.4)', whiteSpace: 'nowrap',
   },
-  mapBadgeDot: { width: 8, height: 8, borderRadius: '50%', flexShrink: 0 },
-  mapBadgeFilter: { color: 'rgba(255,255,255,0.45)', fontWeight: 400, fontSize: 12 },
+  mapBadgeDot    : { width: 8, height: 8, borderRadius: '50%', flexShrink: 0 },
+  mapBadgeFilter : { color: 'rgba(255,255,255,0.45)', fontWeight: 400, fontSize: 12 },
   featureCountBadge: {
     position: 'absolute', bottom: 32, left: 20, zIndex: 999,
     background: 'rgba(13,13,30,0.8)', backdropFilter: 'blur(8px)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 8, padding: '5px 10px', color: 'rgba(255,255,255,0.45)',
+    border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '5px 10px', color: 'rgba(255,255,255,0.45)',
   },
   zoomControls: {
     position: 'absolute', bottom: 32, right: 20, zIndex: 999,
-    display: 'flex', flexDirection: 'column',
-    borderRadius: 10, overflow: 'hidden',
-    boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-    border: '1px solid rgba(255,255,255,0.1)',
+    display: 'flex', flexDirection: 'column', borderRadius: 10, overflow: 'hidden',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.1)',
   },
   zoomBtn: {
-    width: 40, height: 40,
-    background: 'rgba(13,13,30,0.9)', backdropFilter: 'blur(8px)',
-    border: 'none', cursor: 'pointer',
-    color: 'rgba(255,255,255,0.7)', fontSize: 20, fontWeight: 300,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    transition: 'background 0.15s',
+    width: 40, height: 40, background: 'rgba(13,13,30,0.9)', backdropFilter: 'blur(8px)',
+    border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.7)', fontSize: 20, fontWeight: 300,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s',
   },
 };
 
 // ─── GLOBAL CSS ───────────────────────────────────────────────────────────────
 const globalCSS = `
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
-
-  html, body, #root {
-    margin: 0; padding: 0;
-    width: 100%; height: 100%;
-    overflow: hidden;
-  }
-
+  html, body, #root { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; }
   * { box-sizing: border-box; }
-
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
-
-  /* Province search input focus */
   input:focus { outline: none; }
-
-  .legend-item:hover {
-    background: rgba(255,255,255,0.07) !important;
-    border-color: rgba(255,255,255,0.12) !important;
-    transform: translateX(2px);
-  }
-  .nutrient-btn:hover {
-    background: rgba(79,195,247,0.07) !important;
-    border-color: rgba(79,195,247,0.2) !important;
-  }
+  .legend-item:hover { background: rgba(255,255,255,0.07) !important; border-color: rgba(255,255,255,0.12) !important; transform: translateX(2px); }
+  .nutrient-btn:hover { background: rgba(79,195,247,0.07) !important; border-color: rgba(79,195,247,0.2) !important; }
   .map-style-btn:hover { background: rgba(255,255,255,0.08) !important; }
   .reset-btn:hover { background: rgba(255,100,100,0.25) !important; }
-  .locate-btn:hover {
-    background: linear-gradient(135deg, rgba(79,195,247,0.25), rgba(124,77,255,0.25)) !important;
-  }
+  .locate-btn:hover { background: linear-gradient(135deg, rgba(79,195,247,0.25), rgba(124,77,255,0.25)) !important; }
   .sidebar-toggle:hover { background: #252545 !important; }
   .zoom-btn:hover { background: rgba(79,195,247,0.15) !important; color: #000000 !important; }
-  .dropdown-item:hover {
-    background: rgba(79,195,247,0.08) !important;
-    color: rgba(255,255,255,0.95) !important;
-  }
-
-  /* Hide default leaflet zoom control */
+  .dropdown-item:hover { background: rgba(79,195,247,0.08) !important; color: rgba(255,255,255,0.95) !important; }
   .leaflet-control-zoom { display: none !important; }
-
-  /* Leaflet popup styling */
   .leaflet-popup-content-wrapper {
-    background: rgba(13,13,30,0.95) !important;
-    backdrop-filter: blur(16px) !important;
-    border: 1px solid rgba(255,255,255,0.12) !important;
-    border-radius: 12px !important;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important;
-    color: #fff !important;
-    padding: 0 !important;
+    background: rgba(13,13,30,0.95) !important; backdrop-filter: blur(16px) !important;
+    border: 1px solid rgba(255,255,255,0.12) !important; border-radius: 12px !important;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important; color: #fff !important; padding: 0 !important;
   }
   .leaflet-popup-content { margin: 14px 16px !important; color: #fff !important; }
   .leaflet-popup-tip { background: rgba(13,13,30,0.95) !important; }
   .leaflet-popup-close-button { color: rgba(255,255,255,0.4) !important; font-size: 16px !important; }
   .leaflet-popup-close-button:hover { color: #fff !important; }
-
   @keyframes spin { to { transform: rotate(360deg); } }
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 `;

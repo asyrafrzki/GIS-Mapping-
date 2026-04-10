@@ -226,7 +226,7 @@ function NutrientChart({ stats, config, selectedLevel, onBarClick }) {
 }
 
 // ─── MAIN APP ────────────────────────────────────────────────────────────────
-export default function App() {
+export default function App({ onNavigate }) {
   const [activeNutrient, setActiveNutrient] = useState(null);
   const [currentGeoData, setCurrentGeoData] = useState(null);
   const [isLoading, setIsLoading]           = useState(false);
@@ -428,18 +428,36 @@ export default function App() {
       <aside style={{ ...styles.sidebar, transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)' }}>
 
         {/* Header */}
-        <div style={styles.sidebarHeader}>
-          <div style={styles.logoRow}>
-            <div style={styles.logoIcon}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-              </svg>
-            </div>
-            <span style={styles.logoText}>SoilMap</span>
-            <span style={styles.logoBadge}>GIS</span>
-          </div>
-          <p style={styles.sidebarSubtitle}>Peta Kesuburan Tanah</p>
-        </div>
+        {/* Header */}
+<div style={styles.sidebarHeader}>
+  <div style={styles.logoRow}>
+    <div style={styles.logoIcon}>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+      </svg>
+    </div>
+    <span style={styles.logoText}>SoilMap</span>
+    <span style={styles.logoBadge}>GIS</span>
+    
+    {/* --- TOMBOL BARU DISINI --- */}
+    <button 
+      onClick={() => onNavigate('dashboard')} 
+      style={{ 
+        marginLeft: 'auto', 
+        padding: '4px 10px', 
+        background: 'rgba(74,222,128,0.12)', 
+        border: '1px solid rgba(74,222,128,0.3)', 
+        borderRadius: 8, 
+        cursor: 'pointer', 
+        color: '#4ade80', 
+        fontSize: 11 
+      }}
+    >
+      📊 Dashboard
+    </button>
+  </div>
+  <p style={styles.sidebarSubtitle}>Peta Kesuburan Tanah</p>
+</div>
 
         {/* ── Province Search ── */}
         <div style={styles.section}>

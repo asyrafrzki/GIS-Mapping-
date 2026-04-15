@@ -278,6 +278,9 @@ export default function Dashboard({ onNavigate }) {
           <button onClick={() => onNavigate('map')} style={S.mapBtn} className="db-map">
             ← Kembali ke Peta
           </button>
+          <button onClick={() => onNavigate('rekomendasi')} style={S.mapBtn}>
+  🌿 Rekomendasi Pupuk
+</button>
         </div>
       </header>
 

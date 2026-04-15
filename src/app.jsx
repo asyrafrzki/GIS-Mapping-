@@ -458,6 +458,20 @@ export default function App({ onNavigate }) {
   </div>
   <p style={styles.sidebarSubtitle}>Peta Kesuburan Tanah</p>
 </div>
+<button
+  onClick={() => onNavigate('digitasi')}
+  style={{
+    padding: '4px 10px',
+    background: 'rgba(168,85,247,0.12)',
+    border: '1px solid rgba(168,85,247,0.3)',
+    borderRadius: 8,
+    cursor: 'pointer',
+    color: '#c084fc',
+    fontSize: 11
+  }}
+>
+  📍 Digitasi
+</button>
 
         {/* ── Province Search ── */}
         <div style={styles.section}>

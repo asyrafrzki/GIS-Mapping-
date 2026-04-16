@@ -430,32 +430,40 @@ export default function App({ onNavigate }) {
         {/* Header */}
         {/* Header */}
 <div style={styles.sidebarHeader}>
-  <div style={styles.logoRow}>
+  <div
+    style={{
+      ...styles.logoRow,
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      gap: 8,
+    }}
+  >
     <div style={styles.logoIcon}>
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
         <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
       </svg>
     </div>
+
     <span style={styles.logoText}>SoilMap</span>
     <span style={styles.logoBadge}>GIS</span>
-    
-    {/* --- TOMBOL BARU DISINI --- */}
-    <button 
-      onClick={() => onNavigate('dashboard')} 
-      style={{ 
-        marginLeft: 'auto', 
-        padding: '4px 10px', 
-        background: 'rgba(74,222,128,0.12)', 
-        border: '1px solid rgba(74,222,128,0.3)', 
-        borderRadius: 8, 
-        cursor: 'pointer', 
-        color: '#4ade80', 
-        fontSize: 11 
-      }}
-    >
-      📊 Dashboard
-    </button>
+
+    <div style={{ width: '100%' }} />
+
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+      <button onClick={() => onNavigate('user-dashboard')} style={btnUserDash}>
+        🏠 Dashboard User
+      </button>
+
+      <button onClick={() => onNavigate('digitasi')} style={btnDigitasi}>
+        📍 Digitasi
+      </button>
+
+      <button onClick={() => onNavigate('laporan')} style={btnLaporan}>
+        📨 Laporan
+      </button>
+    </div>
   </div>
+
   <p style={styles.sidebarSubtitle}>Peta Kesuburan Tanah</p>
 </div>
 <button
@@ -1040,6 +1048,7 @@ const styles = {
     border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.7)', fontSize: 20, fontWeight: 300,
     display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s',
   },
+  
 };
 
 // ─── GLOBAL CSS ───────────────────────────────────────────────────────────────
@@ -1072,3 +1081,32 @@ const globalCSS = `
   @keyframes spin { to { transform: rotate(360deg); } }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 `;
+const btnUserDash = {
+  padding: '4px 10px',
+  background: 'rgba(74,222,128,0.12)',
+  border: '1px solid rgba(74,222,128,0.3)',
+  borderRadius: 8,
+  cursor: 'pointer',
+  color: '#4ade80',
+  fontSize: 11,
+};
+
+const btnDigitasi = {
+  padding: '4px 10px',
+  background: 'rgba(168,85,247,0.12)',
+  border: '1px solid rgba(168,85,247,0.3)',
+  borderRadius: 8,
+  cursor: 'pointer',
+  color: '#c084fc',
+  fontSize: 11,
+};
+
+const btnLaporan = {
+  padding: '4px 10px',
+  background: 'rgba(96,165,250,0.12)',
+  border: '1px solid rgba(96,165,250,0.3)',
+  borderRadius: 8,
+  cursor: 'pointer',
+  color: '#60a5fa',
+  fontSize: 11,
+};

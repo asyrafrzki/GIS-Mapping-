@@ -44,8 +44,8 @@ export async function createReportFromPoint(req, res) {
       `Deskripsi: ${point.deskripsi || '-'}`;
 
     const result = await pool.query(
-      `INSERT INTO reports (user_id, point_id, title, category, message, status)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO reports (user_id, point_id, title, category, message, status, admin_note)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
       [
         req.user.id,
@@ -54,6 +54,7 @@ export async function createReportFromPoint(req, res) {
         category,
         message,
         'menunggu persetujuan',
+        '',
       ]
     );
 
@@ -113,11 +114,24 @@ export async function getAllReports(req, res) {
          u.email AS user_email,
          fp.nama AS point_name,
          fp.lokasi,
-         fp.daerah
+         fp.daerah,
+         fp.lat,
+         fp.lng,
+         fp.radius,
+         fp.status_tindak_lanjut,
+         fp.deskripsi
        FROM reports r
        JOIN users u ON u.id = r.user_id
        LEFT JOIN field_points fp ON fp.id = r.point_id
-       ORDER BY r.created_at DESC`
+       ORDER BY
+         CASE
+           WHEN r.status = 'menunggu persetujuan' THEN 1
+           WHEN r.status = 'diproses' THEN 2
+           WHEN r.status = 'selesai' THEN 3
+           WHEN r.status = 'ditolak' THEN 4
+           ELSE 5
+         END,
+         r.created_at DESC`
     );
 
     return res.json(result.rows);
@@ -131,6 +145,17 @@ export async function updateReportStatus(req, res) {
   try {
     const { id } = req.params;
     const { status, adminNote } = req.body;
+
+    const allowedStatus = [
+      'menunggu persetujuan',
+      'diproses',
+      'selesai',
+      'ditolak',
+    ];
+
+    if (!allowedStatus.includes(status)) {
+      return res.status(400).json({ message: 'Status tidak valid.' });
+    }
 
     const result = await pool.query(
       `UPDATE reports

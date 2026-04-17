@@ -37,11 +37,20 @@ export async function getUserDashboard(req, res) {
 
 export async function getAdminDashboard(req, res) {
   try {
-    const [usersCount, pointsCount, reportsCount, pendingReports] = await Promise.all([
+    const [
+      usersCount,
+      pointsCount,
+      reportsCount,
+      pendingReports,
+      processedReports,
+      completedReports,
+    ] = await Promise.all([
       pool.query(`SELECT COUNT(*)::int AS total FROM users WHERE role = 'user'`),
       pool.query('SELECT COUNT(*)::int AS total FROM field_points'),
       pool.query('SELECT COUNT(*)::int AS total FROM reports'),
-      pool.query(`SELECT COUNT(*)::int AS total FROM reports WHERE status IN ('baru','diproses')`),
+      pool.query(`SELECT COUNT(*)::int AS total FROM reports WHERE status = 'menunggu persetujuan'`),
+      pool.query(`SELECT COUNT(*)::int AS total FROM reports WHERE status = 'diproses'`),
+      pool.query(`SELECT COUNT(*)::int AS total FROM reports WHERE status = 'selesai'`),
     ]);
 
     return res.json({
@@ -49,6 +58,8 @@ export async function getAdminDashboard(req, res) {
       totalPoints: pointsCount.rows[0].total,
       totalReports: reportsCount.rows[0].total,
       pendingReports: pendingReports.rows[0].total,
+      processedReports: processedReports.rows[0].total,
+      completedReports: completedReports.rows[0].total,
     });
   } catch (err) {
     console.error('getAdminDashboard error:', err);

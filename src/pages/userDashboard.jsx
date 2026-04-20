@@ -42,6 +42,7 @@ export default function UserDashboard({ token, currentUser, onNavigate, onLogout
           <button style={s.secondaryBtn} onClick={() => onNavigate('map')}>Peta</button>
           <button style={s.secondaryBtn} onClick={() => onNavigate('digitasi')}>Digitasi</button>
           <button style={s.secondaryBtn} onClick={() => onNavigate('laporan')}>Laporan</button>
+          <button style={s.secondaryBtn} onClick={() => onNavigate('analisis-tanah')}> Analisis Tanah</button>
           <button style={s.dangerBtn} onClick={onLogout}>Logout</button>
         </div>
       </div>

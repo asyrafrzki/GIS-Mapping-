@@ -461,6 +461,9 @@ export default function App({ onNavigate }) {
       <button onClick={() => onNavigate('laporan')} style={btnLaporan}>
         📨 Laporan
       </button>
+      <button onClick={() => onNavigate('analisis-tanah')}>
+        🧪 Analisis Tanah
+      </button>
     </div>
   </div>
 

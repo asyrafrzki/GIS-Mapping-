@@ -4,6 +4,7 @@ import authRoutes from './routes/authRoutes.js';
 import pointRoutes from './routes/pointRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
+import analisisTanahRoutes from './routes/analisisTanahRoutes.js';
 
 const app = express();
 
@@ -22,5 +23,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api/points', pointRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/analisis-tanah', analisisTanahRoutes);
 
 export default app;

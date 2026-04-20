@@ -8,6 +8,7 @@ import LoginPage from './pages/login.jsx';
 import RegisterPage from './pages/register.jsx';
 import UserDashboard from './pages/userDashboard.jsx';
 import AdminDashboard from './pages/adminDashboard.jsx';
+import AnalisisTanah from './pages/analisisTanah.jsx';
 import LaporanPage from './pages/laporan.jsx';
 import { getSession, clearSession } from './services/api';
 import 'leaflet/dist/leaflet.css';
@@ -84,6 +85,15 @@ function Root() {
       />
     );
   }
+
+  if (page === 'analisis-tanah') {
+  return (
+    <AnalisisTanah
+      token={session.token}
+      onNavigate={setPage}
+    />
+  );
+}
 
   return <App onNavigate={setPage} />;
 }

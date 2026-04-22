@@ -17,6 +17,10 @@ export default function AnalisisTanah({ token, onNavigate }) {
     p: '',
     k: '',
     mg: '',
+    nSource: '',
+    pSource: '',
+    kSource: '',
+    mgSource: '',
     umur: '',
     luas: '',
     protas: '',
@@ -46,65 +50,20 @@ export default function AnalisisTanah({ token, onNavigate }) {
     loadHistory();
   }, [token]);
 
-  const mapHistoryRowToResult = (row) => {
-    if (!row) return null;
+  const buildResultFromHistory = (row) => ({
+    summary: {
+      aplikasi1_total: Number(row.aplikasi1_total),
+      aplikasi2_total: Number(row.aplikasi2_total),
+      total_rekomendasi: Number(row.total_rekomendasi),
+    },
+    recommendations: [
+      'Hasil ini berasal dari analisis yang sudah tersimpan.',
+      'Lakukan evaluasi ulang setelah aplikasi 2 untuk memastikan respon tanaman.',
+    ],
+  });
 
-    return {
-      produksi: Number(row.produksi),
-      prodPerPohon: Number(row.prod_per_pohon),
-      prod_n: Number(row.prod_n),
-      prod_p: Number(row.prod_p),
-      prod_k: Number(row.prod_k),
-      prod_mg: Number(row.prod_mg),
-      bio_n: Number(row.bio_n),
-      bio_p: Number(row.bio_p),
-      bio_k: Number(row.bio_k),
-      bio_mg: Number(row.bio_mg),
-      urea_awal: Number(row.urea_awal),
-      tsp_awal: Number(row.tsp_awal),
-      kcl_awal: Number(row.kcl_awal),
-      dolomit_awal: Number(row.dolomit_awal),
-      urea_akhir: Number(row.urea_akhir),
-      tsp_akhir: Number(row.tsp_akhir),
-      kcl_akhir: Number(row.kcl_akhir),
-      dolomit_akhir: Number(row.dolomit_akhir),
-      aplikasi1: {
-        urea: Number(row.urea_app1),
-        tsp: Number(row.tsp_app1),
-        kcl: Number(row.kcl_app1),
-        dolomit: Number(row.dolomit_app1),
-      },
-      aplikasi2: {
-        urea: Number(row.urea_app2),
-        tsp: Number(row.tsp_app2),
-        kcl: Number(row.kcl_app2),
-        dolomit: Number(row.dolomit_app2),
-      },
-    };
-  };
-
-  const fillFormFromHistory = (row) => {
-    setForm({
-      pointId: row.point_id ? String(row.point_id) : '',
-      pointName: row.point_name || '',
-      lokasi: row.lokasi || '',
-      daerah: row.daerah || '',
-      radius: row.radius || '',
-      n: row.n ?? '',
-      p: row.p ?? '',
-      k: row.k ?? '',
-      mg: row.mg ?? '',
-      umur: row.umur ?? '',
-      luas: row.luas ?? '',
-      protas: row.protas ?? '',
-      jumlahPohon: row.jumlah_pohon ?? '',
-    });
-  };
-
-  const handleSelectPoint = async (id) => {
-    const point = points.find((item) => String(item.id) === String(id));
-
-    if (!point) {
+  const handleSelectPoint = async (pointId) => {
+    if (!pointId) {
       setForm({
         pointId: '',
         pointName: '',
@@ -115,6 +74,10 @@ export default function AnalisisTanah({ token, onNavigate }) {
         p: '',
         k: '',
         mg: '',
+        nSource: '',
+        pSource: '',
+        kSource: '',
+        mgSource: '',
         umur: '',
         luas: '',
         protas: '',
@@ -125,31 +88,39 @@ export default function AnalisisTanah({ token, onNavigate }) {
       return;
     }
 
-    setForm((prev) => ({
-      ...prev,
-      pointId: String(point.id),
-      pointName: point.nama || '',
-      lokasi: point.lokasi || '',
-      daerah: point.daerah || '',
-      radius: point.radius || '',
-    }));
-
-    setSelectedHistoryId(null);
-
     try {
-      const latest = await apiRequest(`/analisis-tanah/point/${point.id}/latest`, {
-        token,
-      });
+      const data = await apiRequest(`/analisis-tanah/point/${pointId}/context`, { token });
 
-      if (latest) {
-        fillFormFromHistory(latest);
-        setResult(mapHistoryRowToResult(latest));
-        setSelectedHistoryId(latest.id);
+      setForm((prev) => ({
+        ...prev,
+        pointId: String(data.point.id),
+        pointName: data.point.nama || '',
+        lokasi: data.point.lokasi || '',
+        daerah: data.point.daerah || '',
+        radius: data.point.radius || '',
+        n: data.nutrients.n,
+        p: data.nutrients.p,
+        k: data.nutrients.k,
+        mg: data.nutrients.mg,
+        nSource: data.nutrients.sources.n,
+        pSource: data.nutrients.sources.p,
+        kSource: data.nutrients.sources.k,
+        mgSource: data.nutrients.sources.mg,
+        umur: data.latestAnalysis?.umur ?? '',
+        luas: data.latestAnalysis?.luas ?? '',
+        protas: data.latestAnalysis?.protas ?? '',
+        jumlahPohon: data.latestAnalysis?.jumlah_pohon ?? '',
+      }));
+
+      if (data.latestAnalysis) {
+        setResult(buildResultFromHistory(data.latestAnalysis));
+        setSelectedHistoryId(data.latestAnalysis.id);
       } else {
         setResult(null);
+        setSelectedHistoryId(null);
       }
     } catch (err) {
-      console.error(err);
+      alert(err.message);
     }
   };
 
@@ -159,14 +130,14 @@ export default function AnalisisTanah({ token, onNavigate }) {
         method: 'POST',
         token,
         body: {
-          n: Number(form.n),
-          p: Number(form.p),
-          k: Number(form.k),
-          mg: Number(form.mg),
           umur: Number(form.umur),
           luas: Number(form.luas),
           protas: Number(form.protas),
           jumlahPohon: Number(form.jumlahPohon),
+          n: Number(form.n),
+          p: Number(form.p),
+          k: Number(form.k),
+          mg: Number(form.mg),
         },
       });
 
@@ -183,11 +154,7 @@ export default function AnalisisTanah({ token, onNavigate }) {
         method: 'POST',
         token,
         body: {
-          pointId: form.pointId ? Number(form.pointId) : null,
-          n: Number(form.n),
-          p: Number(form.p),
-          k: Number(form.k),
-          mg: Number(form.mg),
+          pointId: Number(form.pointId),
           umur: Number(form.umur),
           luas: Number(form.luas),
           protas: Number(form.protas),
@@ -204,12 +171,6 @@ export default function AnalisisTanah({ token, onNavigate }) {
     }
   };
 
-  const showHistoryDetail = (item) => {
-    fillFormFromHistory(item);
-    setResult(mapHistoryRowToResult(item));
-    setSelectedHistoryId(item.id);
-  };
-
   return (
     <div style={s.page}>
       <style>{css}</style>
@@ -219,7 +180,7 @@ export default function AnalisisTanah({ token, onNavigate }) {
           <div style={s.kicker}>ANALISIS TANAH</div>
           <h1 style={s.title}>Perhitungan Dosis Berbasis Titik & Radius</h1>
           <p style={s.desc}>
-            Pilih titik lahan, isi kandungan unsur tanah, lalu hitung rekomendasi dosis pupuk beserta detail perhitungannya.
+            Pilih lahan, sistem mengambil kandungan daun N dan Mg dari GeoJSON daerah titik, lalu hitung rekomendasi dosis berdasarkan input produksi.
           </p>
         </div>
 
@@ -256,37 +217,67 @@ export default function AnalisisTanah({ token, onNavigate }) {
             <label style={s.label}>Daerah</label>
             <input style={s.input} value={form.daerah} readOnly />
 
-            <label style={s.label}>Radius Area</label>
+            <label style={s.label}>Radius Area (maks 100 m)</label>
             <input style={s.input} value={form.radius} readOnly />
           </div>
 
           <div style={s.card} className="glass">
-            <h3 style={s.sectionTitle}>Input Kandungan Tanah</h3>
+            <h3 style={s.sectionTitle}>Kandungan Daun (%)</h3>
 
-            <label style={s.label}>N</label>
-            <input style={s.input} value={form.n} onChange={(e) => setForm({ ...form, n: e.target.value })} />
+            <div style={s.readonlyRow}>
+              <div style={s.readonlyItem}>
+                <div style={s.readonlyLabel}>Nitrogen (N)</div>
+                <div style={s.readonlyValue}>{form.n || '-'}</div>
+                <div style={s.sourceBadge}>{form.nSource || '-'}</div>
+              </div>
 
-            <label style={s.label}>P</label>
-            <input style={s.input} value={form.p} onChange={(e) => setForm({ ...form, p: e.target.value })} />
+              <div style={s.readonlyItem}>
+                <div style={s.readonlyLabel}>Fosfor (P)</div>
+                <div style={s.readonlyValue}>{form.p || '-'}</div>
+                <div style={s.sourceBadge}>{form.pSource || '-'}</div>
+              </div>
 
-            <label style={s.label}>K</label>
-            <input style={s.input} value={form.k} onChange={(e) => setForm({ ...form, k: e.target.value })} />
+              <div style={s.readonlyItem}>
+                <div style={s.readonlyLabel}>Kalium (K)</div>
+                <div style={s.readonlyValue}>{form.k || '-'}</div>
+                <div style={s.sourceBadge}>{form.kSource || '-'}</div>
+              </div>
 
-            <label style={s.label}>Mg</label>
-            <input style={s.input} value={form.mg} onChange={(e) => setForm({ ...form, mg: e.target.value })} />
+              <div style={s.readonlyItem}>
+                <div style={s.readonlyLabel}>Magnesium (Mg)</div>
+                <div style={s.readonlyValue}>{form.mg || '-'}</div>
+                <div style={s.sourceBadge}>{form.mgSource || '-'}</div>
+              </div>
+            </div>
+
+            <div style={s.noteText}>
+              N dan Mg diambil otomatis dari GeoJSON berdasarkan lokasi titik. P dan K sementara memakai nilai default sistem sampai file GeoJSON tersedia.
+            </div>
           </div>
 
           <div style={s.card} className="glass">
             <h3 style={s.sectionTitle}>Input Produksi</h3>
 
             <label style={s.label}>Umur</label>
-            <input style={s.input} value={form.umur} onChange={(e) => setForm({ ...form, umur: e.target.value })} />
+            <input
+              style={s.input}
+              value={form.umur}
+              onChange={(e) => setForm({ ...form, umur: e.target.value })}
+            />
 
             <label style={s.label}>Luas</label>
-            <input style={s.input} value={form.luas} onChange={(e) => setForm({ ...form, luas: e.target.value })} />
+            <input
+              style={s.input}
+              value={form.luas}
+              onChange={(e) => setForm({ ...form, luas: e.target.value })}
+            />
 
             <label style={s.label}>Protas</label>
-            <input style={s.input} value={form.protas} onChange={(e) => setForm({ ...form, protas: e.target.value })} />
+            <input
+              style={s.input}
+              value={form.protas}
+              onChange={(e) => setForm({ ...form, protas: e.target.value })}
+            />
 
             <label style={s.label}>Jumlah Pohon</label>
             <input
@@ -317,79 +308,37 @@ export default function AnalisisTanah({ token, onNavigate }) {
               <div style={s.empty}>Belum ada hasil perhitungan.</div>
             ) : (
               <>
-                <div style={s.resultGrid}>
-                  <div style={s.resultBox}>
-                    <div style={s.resultLabel}>Produksi</div>
-                    <div style={s.resultValue}>{result.produksi.toFixed(2)}</div>
+                <div style={s.summaryGrid}>
+                  <div style={s.summaryCard}>
+                    <div style={s.summaryLabel}>Aplikasi 1</div>
+                    <div style={s.summaryValue}>{result.summary.aplikasi1_total}</div>
                   </div>
-                  <div style={s.resultBox}>
-                    <div style={s.resultLabel}>Produksi/Pohon</div>
-                    <div style={s.resultValue}>{result.prodPerPohon.toFixed(2)}</div>
+
+                  <div style={s.summaryCard}>
+                    <div style={s.summaryLabel}>Aplikasi 2</div>
+                    <div style={s.summaryValue}>{result.summary.aplikasi2_total}</div>
+                  </div>
+
+                  <div style={s.summaryCard}>
+                    <div style={s.summaryLabel}>Total Rekomendasi</div>
+                    <div style={s.summaryValue}>{result.summary.total_rekomendasi}</div>
                   </div>
                 </div>
 
-                <div style={s.subSection}>
-                  <h4 style={s.subTitle}>Detail Prod</h4>
-                  <div style={s.detailGrid}>
-                    <div>Prod N: {result.prod_n.toFixed(2)}</div>
-                    <div>Prod P: {result.prod_p.toFixed(2)}</div>
-                    <div>Prod K: {result.prod_k.toFixed(2)}</div>
-                    <div>Prod Mg: {result.prod_mg.toFixed(2)}</div>
+                <div style={s.rekomendasiCard}>
+                  <h4 style={s.rekomendasiTitle}>Rekomendasi Tindakan</h4>
+                  <div style={s.rekomendasiList}>
+                    {result.recommendations?.length ? (
+                      result.recommendations.map((item, idx) => (
+                        <div key={idx} style={s.rekomendasiItem}>
+                          <span style={s.rekomendasiDot}>✓</span>
+                          <span>{item}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div style={s.empty}>Belum ada rekomendasi.</div>
+                    )}
                   </div>
-                </div>
-
-                <div style={s.subSection}>
-                  <h4 style={s.subTitle}>Detail Bio</h4>
-                  <div style={s.detailGrid}>
-                    <div>Bio N: {result.bio_n.toFixed(2)}</div>
-                    <div>Bio P: {result.bio_p.toFixed(2)}</div>
-                    <div>Bio K: {result.bio_k.toFixed(2)}</div>
-                    <div>Bio Mg: {result.bio_mg.toFixed(2)}</div>
-                  </div>
-                </div>
-
-                <div style={s.tableWrap}>
-                  <table style={s.table}>
-                    <thead>
-                      <tr>
-                        <th>Pupuk</th>
-                        <th>Awal</th>
-                        <th>Akhir</th>
-                        <th>Aplikasi 1</th>
-                        <th>Aplikasi 2</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td>Urea</td>
-                        <td>{result.urea_awal}</td>
-                        <td>{result.urea_akhir}</td>
-                        <td>{result.aplikasi1.urea}</td>
-                        <td>{result.aplikasi2.urea}</td>
-                      </tr>
-                      <tr>
-                        <td>TSP</td>
-                        <td>{result.tsp_awal}</td>
-                        <td>{result.tsp_akhir}</td>
-                        <td>{result.aplikasi1.tsp}</td>
-                        <td>{result.aplikasi2.tsp}</td>
-                      </tr>
-                      <tr>
-                        <td>KCl</td>
-                        <td>{result.kcl_awal}</td>
-                        <td>{result.kcl_akhir}</td>
-                        <td>{result.aplikasi1.kcl}</td>
-                        <td>{result.aplikasi2.kcl}</td>
-                      </tr>
-                      <tr>
-                        <td>Dolomit</td>
-                        <td>{result.dolomit_awal}</td>
-                        <td>{result.dolomit_akhir}</td>
-                        <td>{result.aplikasi1.dolomit}</td>
-                        <td>{result.aplikasi2.dolomit}</td>
-                      </tr>
-                    </tbody>
-                  </table>
                 </div>
               </>
             )}
@@ -410,30 +359,14 @@ export default function AnalisisTanah({ token, onNavigate }) {
                       selectedHistoryId === item.id
                         ? '1px solid rgba(96,165,250,0.35)'
                         : '1px solid transparent',
-                    borderRadius: 14,
-                    padding: 14,
-                    marginBottom: 10,
-                    background:
-                      selectedHistoryId === item.id
-                        ? 'rgba(96,165,250,0.06)'
-                        : 'rgba(255,255,255,0.01)',
                   }}
                 >
-                  <div style={s.historyTop}>
-                    <div>
-                      <div style={s.historyTitle}>{item.point_name || 'Tanpa titik'}</div>
-                      <div style={s.historyMeta}>
-                        {item.lokasi || '-'} · {item.daerah || '-'} · Radius {item.radius || 0} m
-                      </div>
-                    </div>
-
-                    <button style={s.viewBtn} onClick={() => showHistoryDetail(item)}>
-                      Lihat Detail
-                    </button>
+                  <div style={s.historyTitle}>{item.point_name || 'Tanpa titik'}</div>
+                  <div style={s.historyMeta}>
+                    {item.lokasi || '-'} · {item.daerah || '-'} · Radius {item.radius || 0} m
                   </div>
-
                   <div style={s.historyDose}>
-                    Urea {item.urea_akhir} | TSP {item.tsp_akhir} | KCl {item.kcl_akhir} | Dolomit {item.dolomit_akhir}
+                    App 1: {item.aplikasi1_total} | App 2: {item.aplikasi2_total} | Total: {item.total_rekomendasi}
                   </div>
                 </div>
               ))
@@ -518,6 +451,43 @@ const s = {
     color: '#fff',
     outline: 'none',
   },
+  readonlyRow: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: 12,
+  },
+  readonlyItem: {
+    padding: 14,
+    borderRadius: 16,
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,255,255,0.05)',
+  },
+  readonlyLabel: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+    marginBottom: 6,
+  },
+  readonlyValue: {
+    fontSize: 22,
+    fontWeight: 800,
+    marginBottom: 8,
+  },
+  sourceBadge: {
+    display: 'inline-block',
+    padding: '4px 8px',
+    borderRadius: 999,
+    background: 'rgba(96,165,250,0.14)',
+    border: '1px solid rgba(96,165,250,0.25)',
+    color: '#60a5fa',
+    fontSize: 12,
+    fontWeight: 700,
+    textTransform: 'capitalize',
+  },
+  noteText: {
+    marginTop: 14,
+    color: 'rgba(255,255,255,0.6)',
+    lineHeight: 1.7,
+  },
   buttonRow: {
     display: 'flex',
     gap: 10,
@@ -551,18 +521,6 @@ const s = {
     cursor: 'pointer',
     fontWeight: 600,
   },
-  viewBtn: {
-    padding: '10px 14px',
-    borderRadius: 12,
-    border: 'none',
-    background: '#2563eb',
-    color: '#fff',
-    cursor: 'pointer',
-    fontWeight: 700,
-  },
-  empty: {
-    color: 'rgba(255,255,255,0.45)',
-  },
   resultHeader: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -579,53 +537,64 @@ const s = {
     fontSize: 12,
     fontWeight: 700,
   },
-  resultGrid: {
+  summaryGrid: {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
+    gridTemplateColumns: 'repeat(3, minmax(0,1fr))',
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 18,
   },
-  resultBox: {
-    padding: 14,
-    borderRadius: 16,
+  summaryCard: {
+    padding: 18,
+    borderRadius: 18,
     background: 'rgba(255,255,255,0.03)',
     border: '1px solid rgba(255,255,255,0.05)',
   },
-  resultLabel: {
-    fontSize: 13,
+  summaryLabel: {
     color: 'rgba(255,255,255,0.56)',
-    marginBottom: 6,
+    fontSize: 13,
+    marginBottom: 8,
   },
-  resultValue: {
-    fontSize: 22,
+  summaryValue: {
+    fontSize: 28,
     fontWeight: 800,
   },
-  subSection: {
-    marginBottom: 16,
+  rekomendasiCard: {
+    marginTop: 8,
+    padding: 16,
+    borderRadius: 18,
+    background: 'rgba(34,197,94,0.07)',
+    border: '1px solid rgba(34,197,94,0.14)',
   },
-  subTitle: {
-    marginBottom: 10,
+  rekomendasiTitle: {
+    marginTop: 0,
+    marginBottom: 12,
+    fontSize: 20,
+    color: '#86efac',
   },
-  detailGrid: {
+  rekomendasiList: {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
     gap: 10,
-    color: 'rgba(255,255,255,0.82)',
   },
-  tableWrap: {
-    overflowX: 'auto',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-  },
-  historyItem: {},
-  historyTop: {
+  rekomendasiItem: {
     display: 'flex',
-    justifyContent: 'space-between',
-    gap: 12,
-    flexWrap: 'wrap',
-    alignItems: 'center',
+    gap: 10,
+    alignItems: 'flex-start',
+    color: 'rgba(255,255,255,0.88)',
+    lineHeight: 1.7,
+  },
+  rekomendasiDot: {
+    color: '#4ade80',
+    fontWeight: 800,
+    marginTop: 1,
+  },
+  empty: {
+    color: 'rgba(255,255,255,0.45)',
+  },
+  historyItem: {
+    padding: 14,
+    borderRadius: 14,
+    background: 'rgba(255,255,255,0.01)',
+    marginBottom: 10,
   },
   historyTitle: {
     fontWeight: 700,
@@ -651,12 +620,6 @@ const css = `
     box-shadow: 0 18px 60px rgba(0,0,0,0.24);
   }
 
-  table th, table td {
-    padding: 12px;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-    text-align: left;
-  }
-
   select, option {
     background: #101a2d;
     color: #fff;
@@ -664,6 +627,14 @@ const css = `
 
   @media (max-width: 980px) {
     div[style*="grid-template-columns: 430px 1fr"] {
+      grid-template-columns: 1fr !important;
+    }
+
+    div[style*="grid-template-columns: repeat(3, minmax(0,1fr))"] {
+      grid-template-columns: 1fr !important;
+    }
+
+    div[style*="grid-template-columns: 1fr 1fr"] {
       grid-template-columns: 1fr !important;
     }
   }

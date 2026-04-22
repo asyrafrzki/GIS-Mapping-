@@ -23,46 +23,27 @@ function generateRecommendations({
   ].sort((a, b) => b.value - a.value);
 
   if (pupukRank[0].value > 0 && pupukRank[1].value > 0) {
-    recs.push(
-      `Prioritaskan aplikasi ${pupukRank[0].name} dan ${pupukRank[1].name} karena dosis akhirnya paling tinggi.`
-    );
-  } else if (pupukRank[0].value > 0) {
-    recs.push(
-      `Prioritaskan aplikasi ${pupukRank[0].name} karena menjadi kebutuhan pupuk tertinggi pada lahan ini.`
-    );
+    recs.push(`Prioritaskan aplikasi ${pupukRank[0].name} dan ${pupukRank[1].name} karena kebutuhan dosisnya paling dominan.`);
   }
 
   if (umur <= 8) {
-    if (n < 2.6) recs.push('Kandungan N masih rendah untuk tanaman muda, sehingga kebutuhan Urea perlu diperhatikan.');
-    if (p < 0.17) recs.push('Kandungan P masih rendah, sehingga aplikasi TSP perlu diprioritaskan.');
-    if (k < 0.9) recs.push('Kandungan K masih rendah, sehingga aplikasi KCl perlu diperhatikan.');
-    if (mg < 0.25) recs.push('Kandungan Mg masih rendah, sehingga dolomit disarankan untuk membantu perbaikan tanah.');
+    if (n < 2.6) recs.push('Kandungan Nitrogen daun masih rendah untuk fase tanaman ini.');
+    if (p < 0.17) recs.push('Kandungan Fosfor daun masih rendah.');
+    if (k < 0.9) recs.push('Kandungan Kalium daun masih rendah.');
+    if (mg < 0.25) recs.push('Kandungan Magnesium daun masih rendah.');
   } else if (umur <= 13) {
-    if (n < 2.5) recs.push('Kandungan N masih rendah pada fase tanaman ini, sehingga Urea masih perlu diperkuat.');
-    if (p < 0.155) recs.push('Kandungan P masih rendah, sehingga TSP tetap diperlukan.');
-    if (k < 0.8) recs.push('Kandungan K masih rendah, sehingga KCl perlu diprioritaskan.');
-    if (mg < 0.2) recs.push('Kandungan Mg masih rendah, sehingga dolomit perlu dipertimbangkan.');
+    if (n < 2.5) recs.push('Kandungan Nitrogen daun masih rendah pada fase pertumbuhan ini.');
+    if (p < 0.155) recs.push('Kandungan Fosfor daun masih rendah.');
+    if (k < 0.8) recs.push('Kandungan Kalium daun masih rendah.');
+    if (mg < 0.2) recs.push('Kandungan Magnesium daun masih rendah.');
   } else {
-    if (n < 2.4) recs.push('Kandungan N masih rendah untuk tanaman tua, sehingga kebutuhan Urea masih perlu diperhatikan.');
-    if (p < 0.15) recs.push('Kandungan P masih rendah, sehingga TSP tetap diperlukan.');
-    if (k < 0.7) recs.push('Kandungan K masih rendah, sehingga KCl perlu diprioritaskan.');
-    if (mg < 0.18) recs.push('Kandungan Mg masih rendah, sehingga dolomit perlu dipertimbangkan.');
+    if (n < 2.4) recs.push('Kandungan Nitrogen daun masih rendah untuk tanaman tua.');
+    if (p < 0.15) recs.push('Kandungan Fosfor daun masih rendah.');
+    if (k < 0.7) recs.push('Kandungan Kalium daun masih rendah.');
+    if (mg < 0.18) recs.push('Kandungan Magnesium daun masih rendah.');
   }
 
-  if (dolomit_akhir >= 2.5) {
-    recs.push('Dosis dolomit cukup tinggi, sehingga perbaikan kondisi tanah menjadi bagian penting dalam rekomendasi pemupukan.');
-  }
-
-  if (kcl_akhir >= 2) {
-    recs.push('Kebutuhan KCl cukup tinggi, menandakan unsur kalium perlu menjadi perhatian utama pada lahan ini.');
-  }
-
-  if (urea_akhir >= 2) {
-    recs.push('Dosis Urea relatif tinggi, sehingga unsur nitrogen menjadi faktor penting dalam rekomendasi pemupukan.');
-  }
-
-  recs.push('Lakukan aplikasi pupuk sesuai pembagian tahap aplikasi 1 dan aplikasi 2 agar penyerapan unsur lebih optimal.');
-  recs.push('Lakukan evaluasi ulang setelah aplikasi 2 untuk melihat perubahan kondisi unsur hara tanah.');
+  recs.push('Lakukan evaluasi ulang setelah aplikasi 2 untuk melihat respon tanaman dan perubahan unsur hara.');
 
   return [...new Set(recs)];
 }
@@ -142,6 +123,15 @@ export function calculateSoilAnalysis(input) {
   const kcl_app2 = mround(kcl_akhir * 0.4, 0.25);
   const dolomit_app2 = mround(dolomit_akhir * 0.4, 0.25);
 
+  const aplikasi1_total = mround(urea_app1 + tsp_app1 + kcl_app1 + dolomit_app1, 0.25);
+  const aplikasi2_total = mround(urea_app2 + tsp_app2 + kcl_app2 + dolomit_app2, 0.25);
+
+  // lebih stabil pakai total dosis akhir langsung
+  const total_rekomendasi = mround(
+    urea_akhir + tsp_akhir + kcl_akhir + dolomit_akhir,
+    0.25
+  );
+
   const recommendations = generateRecommendations({
     umur,
     n,
@@ -179,12 +169,19 @@ export function calculateSoilAnalysis(input) {
       tsp: tsp_app1,
       kcl: kcl_app1,
       dolomit: dolomit_app1,
+      total: aplikasi1_total,
     },
     aplikasi2: {
       urea: urea_app2,
       tsp: tsp_app2,
       kcl: kcl_app2,
       dolomit: dolomit_app2,
+      total: aplikasi2_total,
+    },
+    summary: {
+      aplikasi1_total,
+      aplikasi2_total,
+      total_rekomendasi,
     },
     recommendations,
   };

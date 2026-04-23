@@ -50,16 +50,34 @@ export default function AnalisisTanah({ token, onNavigate }) {
     loadHistory();
   }, [token]);
 
+  const buildRecommendationsFromHistory = () => {
+    return [
+      'Hasil ini berasal dari analisis yang sudah tersimpan.',
+      'Lakukan evaluasi ulang setelah aplikasi 2 untuk memastikan respon tanaman.',
+    ];
+  };
+
   const buildResultFromHistory = (row) => ({
     summary: {
       aplikasi1_total: Number(row.aplikasi1_total),
       aplikasi2_total: Number(row.aplikasi2_total),
       total_rekomendasi: Number(row.total_rekomendasi),
     },
-    recommendations: [
-      'Hasil ini berasal dari analisis yang sudah tersimpan.',
-      'Lakukan evaluasi ulang setelah aplikasi 2 untuk memastikan respon tanaman.',
-    ],
+    aplikasi1: {
+      urea: Number(row.urea_app1),
+      tsp: Number(row.tsp_app1),
+      kcl: Number(row.kcl_app1),
+      dolomit: Number(row.dolomit_app1),
+      total: Number(row.aplikasi1_total),
+    },
+    aplikasi2: {
+      urea: Number(row.urea_app2),
+      tsp: Number(row.tsp_app2),
+      kcl: Number(row.kcl_app2),
+      dolomit: Number(row.dolomit_app2),
+      total: Number(row.aplikasi2_total),
+    },
+    recommendations: buildRecommendationsFromHistory(row),
   });
 
   const handleSelectPoint = async (pointId) => {
@@ -170,6 +188,37 @@ export default function AnalisisTanah({ token, onNavigate }) {
       alert(err.message);
     }
   };
+
+  const showHistoryDetail = (item) => {
+    setSelectedHistoryId(item.id);
+
+    setForm((prev) => ({
+      ...prev,
+      pointId: item.point_id ? String(item.point_id) : '',
+      pointName: item.point_name || '',
+      lokasi: item.lokasi || '',
+      daerah: item.daerah || '',
+      radius: item.radius || '',
+      n: item.n ?? '',
+      p: item.p ?? '',
+      k: item.k ?? '',
+      mg: item.mg ?? '',
+      nSource: item.n_source || '',
+      pSource: item.p_source || '',
+      kSource: item.k_source || '',
+      mgSource: item.mg_source || '',
+      umur: item.umur ?? '',
+      luas: item.luas ?? '',
+      protas: item.protas ?? '',
+      jumlahPohon: item.jumlah_pohon ?? '',
+    }));
+
+    setResult(buildResultFromHistory(item));
+  };
+
+  const filteredHistory = form.pointId
+    ? history.filter((item) => String(item.point_id) === String(form.pointId))
+    : [];
 
   return (
     <div style={s.page}>
@@ -310,12 +359,12 @@ export default function AnalisisTanah({ token, onNavigate }) {
               <>
                 <div style={s.summaryGrid}>
                   <div style={s.summaryCard}>
-                    <div style={s.summaryLabel}>Aplikasi 1</div>
+                    <div style={s.summaryLabel}>Aplikasi I</div>
                     <div style={s.summaryValue}>{result.summary.aplikasi1_total}</div>
                   </div>
 
                   <div style={s.summaryCard}>
-                    <div style={s.summaryLabel}>Aplikasi 2</div>
+                    <div style={s.summaryLabel}>Aplikasi II</div>
                     <div style={s.summaryValue}>{result.summary.aplikasi2_total}</div>
                   </div>
 
@@ -323,6 +372,52 @@ export default function AnalisisTanah({ token, onNavigate }) {
                     <div style={s.summaryLabel}>Total Rekomendasi</div>
                     <div style={s.summaryValue}>{result.summary.total_rekomendasi}</div>
                   </div>
+                </div>
+
+                <div style={s.detailTableWrap}>
+                  <div style={s.detailTitle}>Rincian Per Jenis Pupuk</div>
+                  <table style={s.detailTable}>
+                    <thead>
+                      <tr>
+                        <th>Pupuk</th>
+                        <th>Aplikasi I</th>
+                        <th>Aplikasi II</th>
+                        <th>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Urea</td>
+                        <td>{result.aplikasi1.urea}</td>
+                        <td>{result.aplikasi2.urea}</td>
+                        <td>{Number(result.aplikasi1.urea) + Number(result.aplikasi2.urea)}</td>
+                      </tr>
+                      <tr>
+                        <td>TSP</td>
+                        <td>{result.aplikasi1.tsp}</td>
+                        <td>{result.aplikasi2.tsp}</td>
+                        <td>{Number(result.aplikasi1.tsp) + Number(result.aplikasi2.tsp)}</td>
+                      </tr>
+                      <tr>
+                        <td>KCl</td>
+                        <td>{result.aplikasi1.kcl}</td>
+                        <td>{result.aplikasi2.kcl}</td>
+                        <td>{Number(result.aplikasi1.kcl) + Number(result.aplikasi2.kcl)}</td>
+                      </tr>
+                      <tr>
+                        <td>Dolomit</td>
+                        <td>{result.aplikasi1.dolomit}</td>
+                        <td>{result.aplikasi2.dolomit}</td>
+                        <td>{Number(result.aplikasi1.dolomit) + Number(result.aplikasi2.dolomit)}</td>
+                      </tr>
+                      <tr style={s.totalRow}>
+                        <td>Total</td>
+                        <td>{result.summary.aplikasi1_total}</td>
+                        <td>{result.summary.aplikasi2_total}</td>
+                        <td>{result.summary.total_rekomendasi}</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
 
                 <div style={s.rekomendasiCard}>
@@ -347,10 +442,12 @@ export default function AnalisisTanah({ token, onNavigate }) {
           <div style={s.card} className="glass">
             <h3 style={s.sectionTitle}>Riwayat Analisis</h3>
 
-            {history.length === 0 ? (
-              <div style={s.empty}>Belum ada riwayat analisis.</div>
+            {!form.pointId ? (
+              <div style={s.empty}>Pilih titik/lahan terlebih dahulu untuk melihat riwayat analisis.</div>
+            ) : filteredHistory.length === 0 ? (
+              <div style={s.empty}>Belum ada riwayat analisis untuk titik yang dipilih.</div>
             ) : (
-              history.map((item) => (
+              filteredHistory.map((item) => (
                 <div
                   key={item.id}
                   style={{
@@ -361,12 +458,35 @@ export default function AnalisisTanah({ token, onNavigate }) {
                         : '1px solid transparent',
                   }}
                 >
-                  <div style={s.historyTitle}>{item.point_name || 'Tanpa titik'}</div>
-                  <div style={s.historyMeta}>
-                    {item.lokasi || '-'} · {item.daerah || '-'} · Radius {item.radius || 0} m
+                  <div style={s.historyTop}>
+                    <div>
+                      <div style={s.historyTitle}>{item.point_name || 'Tanpa titik'}</div>
+                      <div style={s.historyMeta}>
+                        {item.lokasi || '-'} · {item.daerah || '-'} · Radius {item.radius || 0} m
+                      </div>
+                    </div>
+
+                    <button style={s.viewBtn} onClick={() => showHistoryDetail(item)}>
+                      Lihat Detail
+                    </button>
                   </div>
-                  <div style={s.historyDose}>
-                    App 1: {item.aplikasi1_total} | App 2: {item.aplikasi2_total} | Total: {item.total_rekomendasi}
+
+                  <div style={s.historyBlock}>
+                    <div style={s.historySubTitle}>Aplikasi I</div>
+                    <div style={s.historyLine}>
+                      Urea: {item.urea_app1} | TSP: {item.tsp_app1} | KCl: {item.kcl_app1} | Dolomit: {item.dolomit_app1} | Total: {item.aplikasi1_total}
+                    </div>
+                  </div>
+
+                  <div style={s.historyBlock}>
+                    <div style={s.historySubTitle}>Aplikasi II</div>
+                    <div style={s.historyLine}>
+                      Urea: {item.urea_app2} | TSP: {item.tsp_app2} | KCl: {item.kcl_app2} | Dolomit: {item.dolomit_app2} | Total: {item.aplikasi2_total}
+                    </div>
+                  </div>
+
+                  <div style={s.historyTotal}>
+                    Total Rekomendasi: {item.total_rekomendasi}
                   </div>
                 </div>
               ))
@@ -558,6 +678,27 @@ const s = {
     fontSize: 28,
     fontWeight: 800,
   },
+  detailTableWrap: {
+    marginTop: 8,
+    marginBottom: 18,
+    overflowX: 'auto',
+  },
+  detailTitle: {
+    fontSize: 18,
+    fontWeight: 700,
+    marginBottom: 12,
+  },
+  detailTable: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    background: 'rgba(255,255,255,0.02)',
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  totalRow: {
+    fontWeight: 800,
+    background: 'rgba(96,165,250,0.08)',
+  },
   rekomendasiCard: {
     marginTop: 8,
     padding: 16,
@@ -591,22 +732,61 @@ const s = {
     color: 'rgba(255,255,255,0.45)',
   },
   historyItem: {
-    padding: 14,
-    borderRadius: 14,
-    background: 'rgba(255,255,255,0.01)',
+    padding: 16,
+    borderRadius: 16,
+    background: 'rgba(255,255,255,0.02)',
+    marginBottom: 12,
+  },
+  historyTop: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 12,
+    flexWrap: 'wrap',
+    alignItems: 'center',
     marginBottom: 10,
+  },
+  viewBtn: {
+    padding: '10px 14px',
+    borderRadius: 12,
+    border: 'none',
+    background: '#2563eb',
+    color: '#fff',
+    cursor: 'pointer',
+    fontWeight: 700,
   },
   historyTitle: {
     fontWeight: 700,
-    fontSize: 16,
+    fontSize: 18,
   },
   historyMeta: {
     marginTop: 4,
     color: 'rgba(255,255,255,0.56)',
   },
-  historyDose: {
-    marginTop: 8,
+  historyBlock: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 12,
+    background: 'rgba(255,255,255,0.03)',
+    border: '1px solid rgba(255,255,255,0.05)',
+  },
+  historySubTitle: {
+    fontSize: 13,
+    fontWeight: 700,
+    marginBottom: 6,
+    color: '#93c5fd',
+  },
+  historyLine: {
     color: 'rgba(255,255,255,0.82)',
+    lineHeight: 1.7,
+  },
+  historyTotal: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    background: 'rgba(34,197,94,0.08)',
+    border: '1px solid rgba(34,197,94,0.14)',
+    fontWeight: 700,
+    color: '#bbf7d0',
   },
 };
 
@@ -623,6 +803,21 @@ const css = `
   select, option {
     background: #101a2d;
     color: #fff;
+  }
+
+  table th, table td {
+    padding: 14px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    text-align: left;
+  }
+
+  table th {
+    color: rgba(255,255,255,0.72);
+    font-size: 14px;
+  }
+
+  table td {
+    color: rgba(255,255,255,0.9);
   }
 
   @media (max-width: 980px) {

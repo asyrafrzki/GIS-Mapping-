@@ -206,10 +206,14 @@ export async function saveAnalysis(req, res) {
 export async function getHistory(req, res) {
   try {
     const result = await pool.query(
-      `SELECT *
-       FROM soil_analysis_results
-       WHERE user_id = $1
-       ORDER BY created_at DESC`,
+      `SELECT
+        sar.*,
+        fp.lat,
+        fp.lng
+       FROM soil_analysis_results sar
+       JOIN field_points fp ON fp.id = sar.point_id
+       WHERE sar.user_id = $1
+       ORDER BY sar.created_at DESC`,
       [req.user.id]
     );
 

@@ -14,6 +14,8 @@ const DEFAULT_MG = 0.20;
 
 let nitrogenCache = null;
 let magnesiumCache = null;
+let fosforCache = null;
+let kaliumCache = null;
 
 const NITROGEN_GRIDCODE_MAP = {
   1: 2.20,
@@ -43,9 +45,27 @@ async function getMagnesiumGeojson() {
   return magnesiumCache;
 }
 
+async function getFosforGeojson() {
+  if (!fosforCache) {
+    fosforCache = await loadGeojson('fosfor.geojson');
+  }
+  return fosforCache;
+}
+
+async function getKaliumGeojson() {
+  if (!kaliumCache) {
+    kaliumCache = await loadGeojson('kalium.geojson');
+  }
+  return kaliumCache;
+}
+
 function extractNumericProperty(properties, candidates = []) {
   for (const key of candidates) {
-    if (properties?.[key] !== undefined && properties?.[key] !== null && properties?.[key] !== '') {
+    if (
+      properties?.[key] !== undefined &&
+      properties?.[key] !== null &&
+      properties?.[key] !== ''
+    ) {
       const val = Number(properties[key]);
       if (!Number.isNaN(val)) return val;
     }
@@ -77,18 +97,16 @@ function findNitrogenValueFromGeojson(geojson, lat, lng) {
           'n',
         ]);
 
-        if (directNitrogen !== null) {
-          return directNitrogen;
-        }
+        if (directNitrogen !== null) return directNitrogen;
 
-        const mappedFromGrid = mapNitrogenGridcodeToKadar(props.gridcode ?? props.GRIDCODE);
-        if (mappedFromGrid !== null) {
-          return mappedFromGrid;
-        }
+        const mappedFromGrid = mapNitrogenGridcodeToKadar(
+          props.gridcode ?? props.GRIDCODE
+        );
+        if (mappedFromGrid !== null) return mappedFromGrid;
 
         return null;
       }
-    } catch (err) {
+    } catch {
       continue;
     }
   }
@@ -117,13 +135,78 @@ function findMagnesiumValueFromGeojson(geojson, lat, lng) {
           'VALUE',
         ]);
 
-        if (mgValue !== null) {
-          return mgValue;
-        }
-
+        if (mgValue !== null) return mgValue;
         return null;
       }
-    } catch (err) {
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
+function findFosforValueFromGeojson(geojson, lat, lng) {
+  if (!geojson?.features?.length) return null;
+
+  const pt = turfPoint([Number(lng), Number(lat)]);
+
+  for (const feature of geojson.features) {
+    try {
+      if (booleanPointInPolygon(pt, feature)) {
+        const props = feature.properties || {};
+
+        const pValue = extractNumericProperty(props, [
+          'Kadar_P',
+          'kadar_p',
+          'Fosfor',
+          'fosfor',
+          'Phosphorus',
+          'phosphorus',
+          'P',
+          'p',
+          'value',
+          'VALUE',
+        ]);
+
+        if (pValue !== null) return pValue;
+        return null;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
+}
+
+function findKaliumValueFromGeojson(geojson, lat, lng) {
+  if (!geojson?.features?.length) return null;
+
+  const pt = turfPoint([Number(lng), Number(lat)]);
+
+  for (const feature of geojson.features) {
+    try {
+      if (booleanPointInPolygon(pt, feature)) {
+        const props = feature.properties || {};
+
+        const kValue = extractNumericProperty(props, [
+          'Kadar_K',
+          'kadar_k',
+          'Kalium',
+          'kalium',
+          'Potassium',
+          'potassium',
+          'K',
+          'k',
+          'value',
+          'VALUE',
+        ]);
+
+        if (kValue !== null) return kValue;
+        return null;
+      }
+    } catch {
       continue;
     }
   }
@@ -132,23 +215,28 @@ function findMagnesiumValueFromGeojson(geojson, lat, lng) {
 }
 
 export async function getNutrientContextForPoint(lat, lng) {
-  const [nitrogenGeojson, magnesiumGeojson] = await Promise.all([
-    getNitrogenGeojson(),
-    getMagnesiumGeojson(),
-  ]);
+  const [nitrogenGeojson, magnesiumGeojson, fosforGeojson, kaliumGeojson] =
+    await Promise.all([
+      getNitrogenGeojson(),
+      getMagnesiumGeojson(),
+      getFosforGeojson(),
+      getKaliumGeojson(),
+    ]);
 
   const nValue = findNitrogenValueFromGeojson(nitrogenGeojson, lat, lng);
   const mgValue = findMagnesiumValueFromGeojson(magnesiumGeojson, lat, lng);
+  const pValue = findFosforValueFromGeojson(fosforGeojson, lat, lng);
+  const kValue = findKaliumValueFromGeojson(kaliumGeojson, lat, lng);
 
   return {
     n: nValue ?? DEFAULT_N,
-    p: DEFAULT_P,
-    k: DEFAULT_K,
+    p: pValue ?? DEFAULT_P,
+    k: kValue ?? DEFAULT_K,
     mg: mgValue ?? DEFAULT_MG,
     sources: {
       n: nValue !== null ? 'geojson-gridcode' : 'default',
-      p: 'default',
-      k: 'default',
+      p: pValue !== null ? 'geojson' : 'default',
+      k: kValue !== null ? 'geojson' : 'default',
       mg: mgValue !== null ? 'geojson' : 'default',
     },
   };

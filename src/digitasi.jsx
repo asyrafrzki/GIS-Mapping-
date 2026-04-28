@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   MapContainer,
   TileLayer,
   Marker,
   Popup,
+  Polygon,
+  Polyline,
   Circle,
   useMapEvents,
 } from 'react-leaflet';
@@ -13,18 +15,7 @@ import 'leaflet/dist/leaflet.css';
 
 const DEFAULT_CENTER = [-6.9175, 107.6191];
 const DEFAULT_ZOOM = 9;
-
-const EMPTY_FORM = {
-  jenis: 'sampel',
-  nama: '',
-  tanggal: '',
-  tanahUser: '',
-  lokasi: '',
-  daerah: '',
-  deskripsi: '',
-  statusTindakLanjut: '',
-  radius: 100,
-};
+const MAX_RADIUS = 100;
 
 const JENIS_OPTIONS = [
   { value: 'sampel', label: 'Titik Sampel Tanah' },
@@ -39,103 +30,209 @@ const STATUS_OPTIONS = [
   'selesai',
 ];
 
-const RADIUS_OPTIONS = [50, 100, 250];
+const EMPTY_FORM = {
+  jenis: 'sampel',
+  nama: '',
+  tanahUser: '',
+  tanggal: '',
+  lokasi: '',
+  daerah: '',
+  deskripsi: '',
+  statusTindakLanjut: '',
+  manualLat: '',
+  manualLng: '',
+};
 
-function createColoredIcon(color) {
+function makeIcon(color, label = '') {
   return L.divIcon({
     className: '',
-    html: `<div style="width:18px;height:18px;border-radius:999px;background:${color};border:3px solid white;box-shadow:0 2px 10px rgba(0,0,0,0.35);"></div>`,
-    iconSize: [18, 18],
-    iconAnchor: [9, 9],
-    popupAnchor: [0, -10],
+    html: `
+      <div style="
+        width:${label ? '30px' : '22px'};
+        height:${label ? '30px' : '22px'};
+        border-radius:50%;
+        background:${color};
+        color:white;
+        border:3px solid white;
+        box-shadow:0 4px 14px rgba(0,0,0,.35);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:12px;
+        font-weight:900;
+      ">
+        ${label}
+      </div>
+    `,
+    iconSize: label ? [30, 30] : [22, 22],
+    iconAnchor: label ? [15, 15] : [11, 11],
   });
 }
-
-const ICONS = {
-  sampel: createColoredIcon('#22c55e'),
-  observasi: createColoredIcon('#60a5fa'),
-  masalah: createColoredIcon('#ef4444'),
-};
 
 function getJenisColor(jenis) {
   if (jenis === 'sampel') return '#22c55e';
   if (jenis === 'observasi') return '#60a5fa';
   if (jenis === 'masalah') return '#ef4444';
-  return '#a78bfa';
+  return '#f59e0b';
 }
 
 function getJenisLabel(jenis) {
-  const found = JENIS_OPTIONS.find((item) => item.value === jenis);
-  return found ? found.label : jenis;
+  return JENIS_OPTIONS.find((item) => item.value === jenis)?.label || jenis;
+}
+
+function toNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function distanceMeter(a, b) {
+  const R = 6371000;
+
+  const lat1 = Number(a.lat) * Math.PI / 180;
+  const lat2 = Number(b.lat) * Math.PI / 180;
+  const dLat = (Number(b.lat) - Number(a.lat)) * Math.PI / 180;
+  const dLng = (Number(b.lng) - Number(a.lng)) * Math.PI / 180;
+
+  const x =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1) *
+      Math.cos(lat2) *
+      Math.sin(dLng / 2) ** 2;
+
+  return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+}
+
+function sortPointsAroundCenter(points, center) {
+  if (!center || points.length < 3) return points;
+
+  return [...points].sort((a, b) => {
+    const angleA = Math.atan2(a.lat - center.lat, a.lng - center.lng);
+    const angleB = Math.atan2(b.lat - center.lat, b.lng - center.lng);
+    return angleA - angleB;
+  });
+}
+
+function getPolygonCenter(points) {
+  if (!points.length) return null;
+
+  const total = points.reduce(
+    (acc, point) => ({
+      lat: acc.lat + Number(point.lat),
+      lng: acc.lng + Number(point.lng),
+    }),
+    { lat: 0, lng: 0 }
+  );
+
+  return {
+    lat: total.lat / points.length,
+    lng: total.lng / points.length,
+  };
+}
+
+function normalizePolygon(value) {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value
+      .map((p) => ({
+        lat: Number(p.lat),
+        lng: Number(p.lng),
+      }))
+      .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+  }
+
+  if (typeof value === 'string') {
+    try {
+      return normalizePolygon(JSON.parse(value));
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
 }
 
 async function reverseGeocode(lat, lng) {
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
-      {
-        headers: {
-          Accept: 'application/json',
-        },
-      }
+      { headers: { Accept: 'application/json' } }
     );
 
-    if (!res.ok) {
-      throw new Error('Gagal mengambil lokasi');
-    }
+    if (!res.ok) throw new Error('reverse geocode failed');
 
     const data = await res.json();
-    const addr = data.address || {};
-
-    const lokasi =
-      addr.village ||
-      addr.suburb ||
-      addr.hamlet ||
-      addr.road ||
-      addr.neighbourhood ||
-      addr.town ||
-      addr.city_district ||
-      '';
-
-    const daerah =
-      addr.city ||
-      addr.county ||
-      addr.state_district ||
-      addr.state ||
-      '';
+    const a = data.address || {};
 
     return {
-      lokasi,
-      daerah,
+      lokasi:
+        a.village ||
+        a.suburb ||
+        a.hamlet ||
+        a.neighbourhood ||
+        a.road ||
+        a.town ||
+        a.city_district ||
+        '',
+      daerah:
+        a.city ||
+        a.county ||
+        a.state_district ||
+        a.state ||
+        '',
     };
-  } catch (err) {
-    console.error('reverseGeocode error:', err);
-    return {
-      lokasi: '',
-      daerah: '',
-    };
+  } catch {
+    return { lokasi: '', daerah: '' };
   }
 }
 
-function MapClickHandler({ addMode, onMapClick }) {
+function MapClick({ enabled, onClick }) {
   useMapEvents({
     click(e) {
-      if (addMode) onMapClick(e.latlng);
+      if (enabled) {
+        onClick({
+          lat: e.latlng.lat,
+          lng: e.latlng.lng,
+        });
+      }
     },
   });
+
   return null;
 }
 
-export default function Digitasi({ onNavigate, token }) {
+export default function Digitasi({ token, onNavigate }) {
   const [points, setPoints] = useState([]);
   const [addMode, setAddMode] = useState(false);
-  const [selectedLatLng, setSelectedLatLng] = useState(null);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [centerPoint, setCenterPoint] = useState(null);
+  const [polygonPoints, setPolygonPoints] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
-  const formRef = useRef(null);
+  const [form, setForm] = useState(EMPTY_FORM);
 
   const isMasalah = form.jenis === 'masalah';
+
+  const allDraftPoints = useMemo(() => {
+    if (!centerPoint) return [];
+    return [centerPoint, ...polygonPoints];
+  }, [centerPoint, polygonPoints]);
+
+  // Titik 1 ikut polygon, tetapi tetap jadi patokan radius.
+  const sortedDraftPolygon = useMemo(() => {
+    if (!centerPoint) return [];
+    return sortPointsAroundCenter([centerPoint, ...polygonPoints], centerPoint);
+  }, [centerPoint, polygonPoints]);
+
+  const maxDistance = useMemo(() => {
+    if (!centerPoint || polygonPoints.length === 0) return 0;
+
+    return polygonPoints.reduce((max, point) => {
+      return Math.max(max, distanceMeter(centerPoint, point));
+    }, 0);
+  }, [centerPoint, polygonPoints]);
+
+  // Minimal total 3 titik: Titik 1 + Titik 2 + Titik 3
+  const polygonReady = centerPoint && polygonPoints.length >= 2;
 
   const loadPoints = async () => {
     try {
@@ -143,6 +240,7 @@ export default function Digitasi({ onNavigate, token }) {
       setPoints(data);
     } catch (err) {
       console.error(err);
+      alert(err.message);
     }
   };
 
@@ -150,39 +248,93 @@ export default function Digitasi({ onNavigate, token }) {
     loadPoints();
   }, [token]);
 
-  const resetForm = () => {
+  const resetAll = () => {
     setForm(EMPTY_FORM);
-    setSelectedLatLng(null);
+    setCenterPoint(null);
+    setPolygonPoints([]);
     setEditingId(null);
-    setLoadingLocation(false);
   };
 
-  const onMapClick = async (latlng) => {
-    setSelectedLatLng(latlng);
-    setEditingId(null);
-    setLoadingLocation(true);
+  const addPoint = async (point) => {
+    const cleanPoint = {
+      lat: Number(point.lat),
+      lng: Number(point.lng),
+    };
 
-    const geo = await reverseGeocode(latlng.lat, latlng.lng);
+    if (!Number.isFinite(cleanPoint.lat) || !Number.isFinite(cleanPoint.lng)) {
+      alert('Latitude dan longitude tidak valid.');
+      return;
+    }
+
+    if (cleanPoint.lat < -90 || cleanPoint.lat > 90) {
+      alert('Latitude harus antara -90 sampai 90.');
+      return;
+    }
+
+    if (cleanPoint.lng < -180 || cleanPoint.lng > 180) {
+      alert('Longitude harus antara -180 sampai 180.');
+      return;
+    }
+
+    if (!centerPoint) {
+      setCenterPoint(cleanPoint);
+
+      setLoadingLocation(true);
+      const geo = await reverseGeocode(cleanPoint.lat, cleanPoint.lng);
+
+      setForm((prev) => ({
+        ...prev,
+        tanggal: prev.tanggal || new Date().toISOString().slice(0, 10),
+        lokasi: geo.lokasi || prev.lokasi,
+        daerah: geo.daerah || prev.daerah,
+      }));
+
+      setLoadingLocation(false);
+      return;
+    }
+
+    const distance = distanceMeter(centerPoint, cleanPoint);
+
+    if (distance > MAX_RADIUS) {
+      alert(`Titik berada di luar radius maksimal ${MAX_RADIUS} meter dari Titik 1.`);
+      return;
+    }
+
+    setPolygonPoints((prev) => [...prev, cleanPoint]);
+  };
+
+  const addManualPoint = async () => {
+    const lat = toNumber(form.manualLat);
+    const lng = toNumber(form.manualLng);
+
+    if (lat === null || lng === null) {
+      alert('Isi latitude dan longitude terlebih dahulu.');
+      return;
+    }
+
+    await addPoint({ lat, lng });
 
     setForm((prev) => ({
-      ...EMPTY_FORM,
-      jenis: prev.jenis,
-      radius: prev.radius || 100,
-      tanggal: new Date().toISOString().slice(0, 10),
-      lokasi: geo.lokasi,
-      daerah: geo.daerah,
-      statusTindakLanjut: prev.jenis === 'masalah' ? 'belum ditindaklanjuti' : '',
+      ...prev,
+      manualLat: '',
+      manualLng: '',
     }));
+  };
 
-    setLoadingLocation(false);
-    setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+  const removeCenterPoint = () => {
+    setCenterPoint(null);
+    setPolygonPoints([]);
+  };
+
+  const removePolygonPoint = (index) => {
+    setPolygonPoints((prev) => prev.filter((_, i) => i !== index));
   };
 
   const submit = async (e) => {
     e.preventDefault();
 
     if (!form.nama.trim()) {
-      alert('Nama titik wajib diisi.');
+      alert('Nama area wajib diisi.');
       return;
     }
 
@@ -191,35 +343,49 @@ export default function Digitasi({ onNavigate, token }) {
       return;
     }
 
-    if (!editingId && !selectedLatLng) {
-      alert('Klik peta terlebih dahulu untuk menentukan titik.');
-      return;
-    }
-
-    if ((form.jenis === 'sampel' || form.jenis === 'observasi') && !form.tanahUser.trim()) {
-      alert('Nama tanah user wajib diisi untuk titik sampel atau observasi.');
-      return;
-    }
-
     if (!form.lokasi.trim() || !form.daerah.trim()) {
-      alert('Lokasi dan daerah wajib terisi.');
+      alert('Lokasi dan daerah wajib diisi.');
       return;
     }
 
-    if (Number(form.radius) <= 0) {
-      alert('Radius harus lebih dari 0.');
+    if (!centerPoint) {
+      alert('Tentukan Titik 1 terlebih dahulu.');
       return;
     }
+
+    if (polygonPoints.length < 2) {
+      alert('Minimal total 3 titik diperlukan untuk membentuk polygon.');
+      return;
+    }
+
+    if (!isMasalah && !form.tanahUser.trim()) {
+      alert('Nama tanah user wajib diisi.');
+      return;
+    }
+
+    const sortedPolygonForSave = sortPointsAroundCenter(polygonPoints, centerPoint);
 
     const payload = {
-      ...form,
-      radius: Number(form.radius),
+      jenis: form.jenis,
+      nama: form.nama,
+      tanggal: form.tanggal,
+      tanahUser: isMasalah ? '' : form.tanahUser,
+      lokasi: form.lokasi,
+      daerah: form.daerah,
       kondisiTanah: '',
-      statusTindakLanjut: form.jenis === 'masalah' ? form.statusTindakLanjut : '',
-      deskripsi: form.jenis === 'masalah' ? form.deskripsi : '',
-      tanahUser: form.jenis === 'masalah' ? '' : form.tanahUser,
-      lat: editingId ? form.lat : selectedLatLng?.lat,
-      lng: editingId ? form.lng : selectedLatLng?.lng,
+      deskripsi: isMasalah ? form.deskripsi : '',
+      statusTindakLanjut: isMasalah ? form.statusTindakLanjut : '',
+      radius: MAX_RADIUS,
+
+      // Titik 1 disimpan di lat/lng utama.
+      lat: centerPoint.lat,
+      lng: centerPoint.lng,
+
+      // Titik 2 dst disimpan di polygon_points.
+      // Saat render nanti digabung lagi dengan Titik 1.
+      areaType: 'polygon',
+      polygonPoints: sortedPolygonForSave,
+      polygon_points: sortedPolygonForSave,
     };
 
     try {
@@ -238,35 +404,41 @@ export default function Digitasi({ onNavigate, token }) {
       }
 
       await loadPoints();
-      resetForm();
+      resetAll();
+      alert(editingId ? 'Area berhasil diupdate.' : 'Area berhasil disimpan.');
     } catch (err) {
       alert(err.message);
     }
   };
 
-  const editPoint = (p) => {
-    setEditingId(p.id);
-    setSelectedLatLng({ lat: p.lat, lng: p.lng });
+  const editPoint = (point) => {
+    const savedPolygon = normalizePolygon(point.polygon_points || point.polygonPoints);
+
+    setEditingId(point.id);
+    setCenterPoint({
+      lat: Number(point.lat),
+      lng: Number(point.lng),
+    });
+    setPolygonPoints(savedPolygon);
 
     setForm({
-      jenis: p.jenis,
-      nama: p.nama || '',
-      tanggal: p.tanggal?.slice(0, 10) || '',
-      tanahUser: p.tanah_user || '',
-      lokasi: p.lokasi || '',
-      daerah: p.daerah || '',
-      deskripsi: p.jenis === 'masalah' ? p.deskripsi || '' : '',
-      statusTindakLanjut: p.jenis === 'masalah' ? p.status_tindak_lanjut || 'belum ditindaklanjuti' : '',
-      radius: p.radius || 100,
-      lat: p.lat,
-      lng: p.lng,
+      jenis: point.jenis || 'sampel',
+      nama: point.nama || '',
+      tanahUser: point.tanah_user || '',
+      tanggal: point.tanggal?.slice(0, 10) || '',
+      lokasi: point.lokasi || '',
+      daerah: point.daerah || '',
+      deskripsi: point.deskripsi || '',
+      statusTindakLanjut: point.status_tindak_lanjut || 'belum ditindaklanjuti',
+      manualLat: '',
+      manualLng: '',
     });
 
-    setTimeout(() => formRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const removePoint = async (id) => {
-    const ok = window.confirm('Hapus titik ini?');
+  const deletePoint = async (id) => {
+    const ok = window.confirm('Hapus area ini?');
     if (!ok) return;
 
     try {
@@ -274,6 +446,7 @@ export default function Digitasi({ onNavigate, token }) {
         method: 'DELETE',
         token,
       });
+
       await loadPoints();
     } catch (err) {
       alert(err.message);
@@ -286,98 +459,95 @@ export default function Digitasi({ onNavigate, token }) {
         method: 'POST',
         token,
       });
+
       alert('Laporan berhasil dikirim. Status: menunggu persetujuan.');
     } catch (err) {
       alert(err.message);
     }
   };
 
-  const totalRadius = useMemo(
-    () => points.reduce((sum, p) => sum + Number(p.radius || 0), 0),
-    [points]
-  );
-
   return (
     <div style={s.page}>
       <style>{css}</style>
 
-      <div style={s.topBar}>
+      <div style={s.header}>
         <div>
           <div style={s.kicker}>DIGITASI USER</div>
-          <h1 style={s.title}>Digitasi Lahan Saya</h1>
-          <p style={s.desc}>
-            Simpan titik lahan lengkap dengan lokasi, daerah, koordinat, dan radius area otomatis dari peta.
+          <h1 style={s.title}>Digitasi Area Lahan</h1>
+          <p style={s.subtitle}>
+            Titik 1 menjadi patokan radius 100 meter dan ikut membentuk polygon. Setelah
+            disimpan, peta hanya menampilkan polygon dan satu marker di tengah area.
           </p>
         </div>
 
-        <button onClick={() => onNavigate('user-dashboard')} style={s.secondaryBtn}>
+        <button style={s.backBtn} onClick={() => onNavigate('user-dashboard')}>
           ← Dashboard User
         </button>
       </div>
 
-      <div style={s.summaryGrid}>
-        <div style={s.summaryCard} className="glass">
-          <div style={s.summaryValue}>{points.length}</div>
-          <div style={s.summaryLabel}>Total Titik</div>
-        </div>
-
-        <div style={s.summaryCard} className="glass">
-          <div style={{ ...s.summaryValue, color: '#a78bfa' }}>{totalRadius} m</div>
-          <div style={s.summaryLabel}>Total Akumulasi Radius</div>
-        </div>
+      <div style={s.statsGrid}>
+        <StatCard value={points.length} label="Total Area" />
+        <StatCard value={`${MAX_RADIUS} m`} label="Radius dari Titik 1" />
+        <StatCard value={allDraftPoints.length} label="Total Titik Aktif" />
       </div>
 
       <div style={s.layout}>
-        <div style={s.leftCol}>
-          <div style={s.card} className="glass">
-            <div style={s.controlRow}>
-              <button onClick={() => setAddMode((v) => !v)} style={s.primaryBtn}>
+        <div style={s.left}>
+          <div style={s.card}>
+            <div style={s.actionTop}>
+              <button
+                type="button"
+                style={addMode ? s.greenBtn : s.darkBtn}
+                onClick={() => setAddMode((prev) => !prev)}
+              >
                 {addMode ? 'Mode Tambah Aktif' : 'Aktifkan Mode Tambah'}
               </button>
 
-              <button onClick={resetForm} style={s.secondaryBtn}>
-                Reset
+              <button type="button" style={s.darkBtn} onClick={removeCenterPoint}>
+                Reset Titik
+              </button>
+
+              <button type="button" style={s.darkBtn} onClick={resetAll}>
+                Reset Form
               </button>
             </div>
 
-            <div style={s.helperBox}>
-              {addMode
-                ? 'Klik pada peta untuk menambahkan titik. Lokasi dan daerah akan terisi otomatis.'
-                : 'Aktifkan mode tambah lalu klik peta untuk membuat titik baru.'}
+            <div style={s.notice}>
+              {!centerPoint
+                ? 'Klik peta atau input koordinat manual untuk membuat Titik 1.'
+                : `Titik 1 sudah dibuat. Tambahkan minimal 2 titik berikutnya dalam radius ${MAX_RADIUS} meter dari Titik 1.`}
             </div>
 
-            <div ref={formRef} />
-            <h3 style={s.cardTitle}>{editingId ? 'Edit Titik' : 'Form Titik'}</h3>
-
             <form onSubmit={submit}>
-              <label style={s.label}>Jenis Titik</label>
+              <h2 style={s.sectionTitle}>{editingId ? 'Edit Area' : 'Form Area'}</h2>
+
+              <label style={s.label}>Jenis Area</label>
               <select
                 style={s.input}
                 value={form.jenis}
                 onChange={(e) =>
-                  setForm((prev) => {
-                    const newJenis = e.target.value;
-                    return {
-                      ...prev,
-                      jenis: newJenis,
-                      tanahUser: newJenis === 'masalah' ? '' : prev.tanahUser,
-                      statusTindakLanjut: newJenis === 'masalah' ? 'belum ditindaklanjuti' : '',
-                      deskripsi: newJenis === 'masalah' ? prev.deskripsi : '',
-                    };
-                  })
+                  setForm((prev) => ({
+                    ...prev,
+                    jenis: e.target.value,
+                    tanahUser: e.target.value === 'masalah' ? '' : prev.tanahUser,
+                    statusTindakLanjut:
+                      e.target.value === 'masalah'
+                        ? prev.statusTindakLanjut || 'belum ditindaklanjuti'
+                        : '',
+                  }))
                 }
               >
-                {JENIS_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
+                {JENIS_OPTIONS.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
                   </option>
                 ))}
               </select>
 
-              <label style={s.label}>Nama Titik</label>
+              <label style={s.label}>Nama Area</label>
               <input
                 style={s.input}
-                placeholder="Nama titik"
+                placeholder="Contoh: Lahan Blok A"
                 value={form.nama}
                 onChange={(e) => setForm({ ...form, nama: e.target.value })}
               />
@@ -387,7 +557,7 @@ export default function Digitasi({ onNavigate, token }) {
                   <label style={s.label}>Nama Tanah User</label>
                   <input
                     style={s.input}
-                    placeholder="Contoh: Lahan kebun blok A"
+                    placeholder="Contoh: Tanah kebun blok A"
                     value={form.tanahUser}
                     onChange={(e) => setForm({ ...form, tanahUser: e.target.value })}
                   />
@@ -402,10 +572,44 @@ export default function Digitasi({ onNavigate, token }) {
                 onChange={(e) => setForm({ ...form, tanggal: e.target.value })}
               />
 
+              <div style={s.manualBox}>
+                <div style={s.manualTitle}>Input Koordinat Manual</div>
+
+                <div style={s.manualHint}>
+                  {!centerPoint
+                    ? 'Koordinat pertama akan menjadi Titik 1.'
+                    : 'Koordinat berikutnya akan menjadi Titik 2, 3, 4, dan seterusnya.'}
+                </div>
+
+                <div style={s.manualGrid}>
+                  <input
+                    style={s.input}
+                    type="number"
+                    step="any"
+                    placeholder="Latitude"
+                    value={form.manualLat}
+                    onChange={(e) => setForm({ ...form, manualLat: e.target.value })}
+                  />
+
+                  <input
+                    style={s.input}
+                    type="number"
+                    step="any"
+                    placeholder="Longitude"
+                    value={form.manualLng}
+                    onChange={(e) => setForm({ ...form, manualLng: e.target.value })}
+                  />
+                </div>
+
+                <button type="button" style={s.fullDarkBtn} onClick={addManualPoint}>
+                  + Tambah Titik dari Koordinat
+                </button>
+              </div>
+
               <label style={s.label}>Lokasi</label>
               <input
                 style={s.input}
-                placeholder={loadingLocation ? 'Mengambil lokasi otomatis...' : 'Lokasi otomatis dari peta'}
+                placeholder={loadingLocation ? 'Mengambil lokasi otomatis...' : 'Lokasi'}
                 value={form.lokasi}
                 onChange={(e) => setForm({ ...form, lokasi: e.target.value })}
               />
@@ -413,7 +617,7 @@ export default function Digitasi({ onNavigate, token }) {
               <label style={s.label}>Daerah</label>
               <input
                 style={s.input}
-                placeholder={loadingLocation ? 'Mengambil daerah otomatis...' : 'Daerah otomatis dari peta'}
+                placeholder={loadingLocation ? 'Mengambil daerah otomatis...' : 'Daerah'}
                 value={form.daerah}
                 onChange={(e) => setForm({ ...form, daerah: e.target.value })}
               />
@@ -424,7 +628,9 @@ export default function Digitasi({ onNavigate, token }) {
                   <select
                     style={s.input}
                     value={form.statusTindakLanjut}
-                    onChange={(e) => setForm({ ...form, statusTindakLanjut: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, statusTindakLanjut: e.target.value })
+                    }
                   >
                     {STATUS_OPTIONS.map((item) => (
                       <option key={item} value={item}>
@@ -433,7 +639,7 @@ export default function Digitasi({ onNavigate, token }) {
                     ))}
                   </select>
 
-                  <label style={s.label}>Deskripsi</label>
+                  <label style={s.label}>Deskripsi Masalah</label>
                   <textarea
                     style={s.textarea}
                     placeholder="Deskripsi masalah lahan..."
@@ -443,186 +649,278 @@ export default function Digitasi({ onNavigate, token }) {
                 </>
               )}
 
-              <label style={s.label}>Radius Buffer</label>
-              <div style={s.radiusRow}>
-                {RADIUS_OPTIONS.map((r) => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setForm({ ...form, radius: r })}
-                    style={{
-                      ...s.radiusBtn,
-                      background:
-                        Number(form.radius) === r
-                          ? 'rgba(168,85,247,0.18)'
-                          : 'rgba(255,255,255,0.04)',
-                      color: Number(form.radius) === r ? '#c084fc' : '#fff',
-                      borderColor:
-                        Number(form.radius) === r
-                          ? 'rgba(168,85,247,0.3)'
-                          : 'rgba(255,255,255,0.08)',
-                    }}
-                  >
-                    {r} m
-                  </button>
-                ))}
+              <div style={s.polygonInfo}>
+                <strong>Status Area</strong>
+                <div>
+                  Titik 1:{' '}
+                  {centerPoint
+                    ? `${centerPoint.lat.toFixed(6)}, ${centerPoint.lng.toFixed(6)}`
+                    : '-'}
+                </div>
+                <div>Total titik area: {allDraftPoints.length}</div>
+                <div>Titik tambahan: {polygonPoints.length}</div>
+                <div>Minimal total titik: 3</div>
+                <div>Batas radius: {MAX_RADIUS} meter dari Titik 1</div>
+                <div>Jarak terjauh dari Titik 1: {maxDistance.toFixed(2)} meter</div>
+                <div>Status: {polygonReady ? 'Polygon siap disimpan' : 'Belum cukup titik'}</div>
               </div>
 
-              <input
-                style={s.input}
-                type="number"
-                placeholder="Radius manual"
-                value={form.radius}
-                onChange={(e) => setForm({ ...form, radius: e.target.value })}
-              />
+              {allDraftPoints.length > 0 && (
+                <div style={s.pointList}>
+                  <strong>Daftar Titik Area</strong>
 
-              <div style={s.coordBox}>
-                {selectedLatLng ? (
-                  <>
-                    <div style={s.coordTitle}>Koordinat Titik</div>
-                    <div>Lat: {selectedLatLng.lat.toFixed(6)}</div>
-                    <div>Lng: {selectedLatLng.lng.toFixed(6)}</div>
-                  </>
-                ) : (
-                  <div>Klik peta untuk menentukan koordinat titik.</div>
-                )}
-              </div>
+                  {centerPoint && (
+                    <div style={s.pointDraft}>
+                      <div>
+                        <div style={s.pointDraftTitle}>Titik 1</div>
+                        <div style={s.smallText}>
+                          {centerPoint.lat.toFixed(6)}, {centerPoint.lng.toFixed(6)}
+                        </div>
+                      </div>
 
-              <button type="submit" style={s.primaryBtn}>
-                {editingId ? 'Update Titik' : 'Simpan Titik'}
+                      <button
+                        type="button"
+                        style={s.redSmallBtn}
+                        onClick={removeCenterPoint}
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  )}
+
+                  {polygonPoints.map((point, index) => (
+                    <div key={`${point.lat}-${point.lng}-${index}`} style={s.pointDraft}>
+                      <div>
+                        <div style={s.pointDraftTitle}>Titik {index + 2}</div>
+                        <div style={s.smallText}>
+                          {point.lat.toFixed(6)}, {point.lng.toFixed(6)}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        style={s.redSmallBtn}
+                        onClick={() => removePolygonPoint(index)}
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button type="submit" style={s.saveBtn}>
+                {editingId ? 'Update Area' : 'Simpan Area Polygon'}
               </button>
             </form>
           </div>
         </div>
 
-        <div style={s.rightCol}>
-          <div style={s.card} className="glass">
+        <div style={s.right}>
+          <div style={s.card}>
             <MapContainer
               center={DEFAULT_CENTER}
               zoom={DEFAULT_ZOOM}
-              style={{ height: 500, width: '100%', borderRadius: 18 }}
+              style={{ height: 540, width: '100%', borderRadius: 18 }}
             >
               <TileLayer
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 attribution="© OpenStreetMap"
               />
 
-              <MapClickHandler addMode={addMode} onMapClick={onMapClick} />
+              <MapClick enabled={addMode} onClick={addPoint} />
 
-              {points.map((p) => (
-                <React.Fragment key={p.id}>
+              {points.map((point) => {
+                const polygon = normalizePolygon(point.polygon_points || point.polygonPoints);
+                const firstPoint = {
+                  lat: Number(point.lat),
+                  lng: Number(point.lng),
+                };
+                const color = getJenisColor(point.jenis);
+
+                const savedAllPoints =
+                  Number.isFinite(firstPoint.lat) && Number.isFinite(firstPoint.lng)
+                    ? [firstPoint, ...polygon]
+                    : polygon;
+
+                const sortedSavedPolygon = sortPointsAroundCenter(savedAllPoints, firstPoint);
+                const totalPointCount = sortedSavedPolygon.length;
+                const markerPoint = getPolygonCenter(sortedSavedPolygon);
+
+                return (
+                  <React.Fragment key={point.id}>
+                    {sortedSavedPolygon.length >= 3 && (
+                      <Polygon
+                        positions={sortedSavedPolygon.map((p) => [p.lat, p.lng])}
+                        pathOptions={{
+                          color,
+                          fillColor: color,
+                          fillOpacity: 0.22,
+                          weight: 2,
+                        }}
+                      />
+                    )}
+
+                    {markerPoint && (
+                      <Marker
+                        position={[markerPoint.lat, markerPoint.lng]}
+                        icon={makeIcon(color, '')}
+                      >
+                        <Popup>
+                          <div style={{ minWidth: 230 }}>
+                            <strong>{point.nama}</strong>
+                            <br />
+                            {getJenisLabel(point.jenis)}
+                            <br />
+                            {point.lokasi || '-'} - {point.daerah || '-'}
+                            <br />
+                            Jumlah titik area: {totalPointCount}
+                            <br />
+                            Radius input: {point.radius || MAX_RADIUS} m
+                          </div>
+                        </Popup>
+                      </Marker>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+
+              {centerPoint && (
+                <>
                   <Circle
-                    center={[p.lat, p.lng]}
-                    radius={p.radius}
+                    center={[centerPoint.lat, centerPoint.lng]}
+                    radius={MAX_RADIUS}
                     pathOptions={{
-                      color: getJenisColor(p.jenis),
-                      weight: 2,
-                      fillColor: getJenisColor(p.jenis),
-                      fillOpacity: 0.12,
+                      color: '#f59e0b',
+                      fillColor: '#f59e0b',
+                      fillOpacity: 0.05,
+                      dashArray: '8 6',
                     }}
                   />
-                  <Marker position={[p.lat, p.lng]} icon={ICONS[p.jenis]}>
+
+                  <Marker
+                    position={[centerPoint.lat, centerPoint.lng]}
+                    icon={makeIcon('#f59e0b', '1')}
+                  >
                     <Popup>
-                      <div style={{ minWidth: 250 }}>
-                        <strong>{p.nama}</strong>
-                        <div>{getJenisLabel(p.jenis)}</div>
-
-                        {(p.jenis === 'sampel' || p.jenis === 'observasi') && p.tanah_user && (
-                          <div>Nama Tanah: {p.tanah_user}</div>
-                        )}
-
-                        <div>Lokasi: {p.lokasi || '-'}</div>
-                        <div>Daerah: {p.daerah || '-'}</div>
-                        <div>Lat: {Number(p.lat).toFixed(6)}</div>
-                        <div>Lng: {Number(p.lng).toFixed(6)}</div>
-                        <div>Radius: {p.radius} m</div>
-
-                        {p.jenis === 'masalah' && p.status_tindak_lanjut?.trim() && (
-                          <div>Status: {p.status_tindak_lanjut}</div>
-                        )}
-
-                        {p.jenis === 'masalah' && p.deskripsi && (
-                          <div>Deskripsi: {p.deskripsi}</div>
-                        )}
-                      </div>
+                      <strong>Titik 1</strong>
+                      <br />
+                      Pusat radius {MAX_RADIUS} meter
+                      <br />
+                      {centerPoint.lat.toFixed(6)}, {centerPoint.lng.toFixed(6)}
                     </Popup>
                   </Marker>
-                </React.Fragment>
-              ))}
+                </>
+              )}
 
-              {selectedLatLng && !editingId && (
-                <Circle
-                  center={[selectedLatLng.lat, selectedLatLng.lng]}
-                  radius={Number(form.radius) || 100}
+              {sortedDraftPolygon.length >= 2 && (
+                <Polyline
+                  positions={sortedDraftPolygon.map((p) => [p.lat, p.lng])}
                   pathOptions={{
                     color: '#f59e0b',
                     weight: 2,
-                    fillColor: '#f59e0b',
-                    fillOpacity: 0.12,
-                    dashArray: '6 4',
+                    dashArray: '6 6',
                   }}
                 />
               )}
+
+              {sortedDraftPolygon.length >= 3 && (
+                <Polygon
+                  positions={sortedDraftPolygon.map((p) => [p.lat, p.lng])}
+                  pathOptions={{
+                    color: '#f59e0b',
+                    fillColor: '#f59e0b',
+                    fillOpacity: 0.24,
+                    weight: 2,
+                  }}
+                />
+              )}
+
+              {polygonPoints.map((point, index) => (
+                <Marker
+                  key={`draft-${index}`}
+                  position={[point.lat, point.lng]}
+                  icon={makeIcon('#f59e0b', index + 2)}
+                >
+                  <Popup>
+                    <strong>Titik {index + 2}</strong>
+                    <br />
+                    {point.lat.toFixed(6)}, {point.lng.toFixed(6)}
+                  </Popup>
+                </Marker>
+              ))}
             </MapContainer>
           </div>
 
-          <div style={s.card} className="glass">
-            <h3 style={s.cardTitle}>Daftar Titik Saya</h3>
+          <div style={s.card}>
+            <h2 style={s.sectionTitle}>Daftar Area Saya</h2>
 
             {points.length === 0 ? (
-              <div style={s.empty}>Belum ada titik.</div>
+              <div style={s.empty}>Belum ada area.</div>
             ) : (
-              points.map((p) => (
-                <div key={p.id} style={s.pointItem}>
-                  <div style={s.pointTop}>
-                    <div>
-                      <div style={s.pointTitle}>{p.nama}</div>
-                      <div style={s.pointMeta}>
-                        <span style={s.typeBadge}>{getJenisLabel(p.jenis)}</span>
-                        <span>{p.lokasi || '-'} · {p.daerah || '-'}</span>
+              points.map((point) => {
+                const polygon = normalizePolygon(point.polygon_points || point.polygonPoints);
+                const isPolygon = polygon.length >= 2;
+
+                return (
+                  <div key={point.id} style={s.areaItem}>
+                    <div style={s.areaTop}>
+                      <div>
+                        <div style={s.areaTitle}>{point.nama}</div>
+                        <div style={s.areaMeta}>
+                          {getJenisLabel(point.jenis)} · {point.lokasi || '-'} ·{' '}
+                          {point.daerah || '-'}
+                        </div>
                       </div>
+
+                      <span style={s.badge}>
+                        {isPolygon ? `${polygon.length + 1} titik area` : 'data lama'}
+                      </span>
                     </div>
 
-                    <span style={s.simpleBadge}>{p.radius} m</span>
-                  </div>
-
-                  {(p.jenis === 'sampel' || p.jenis === 'observasi') && p.tanah_user && (
-                    <div style={s.pointInfo}>
-                      <strong>Nama Tanah:</strong> {p.tanah_user}
-                    </div>
-                  )}
-
-                  {p.jenis === 'masalah' && p.status_tindak_lanjut?.trim() && (
-                    <div style={s.pointInfo}>
-                      <strong>Status Tindak Lanjut:</strong> {p.status_tindak_lanjut}
-                    </div>
-                  )}
-
-                  <div style={s.pointInfo}>
-                    <strong>Koordinat:</strong> {Number(p.lat).toFixed(6)}, {Number(p.lng).toFixed(6)}
-                  </div>
-
-                  {p.jenis === 'masalah' && p.deskripsi && (
-                    <div style={s.descBox}>{p.deskripsi}</div>
-                  )}
-
-                  <div style={s.actionRow}>
-                    <button onClick={() => editPoint(p)} style={s.secondaryBtn}>
-                      Edit
-                    </button>
-
-                    {p.jenis === 'masalah' && (
-                      <button onClick={() => sendReport(p.id)} style={s.primaryBtn}>
-                        Kirim Laporan
-                      </button>
+                    {!point.jenis?.includes('masalah') && point.tanah_user && (
+                      <div style={s.infoText}>
+                        <strong>Nama Tanah:</strong> {point.tanah_user}
+                      </div>
                     )}
 
-                    <button onClick={() => removePoint(p.id)} style={s.dangerBtn}>
-                      Hapus
-                    </button>
+                    {point.jenis === 'masalah' && (
+                      <>
+                        <div style={s.infoText}>
+                          <strong>Status:</strong>{' '}
+                          {point.status_tindak_lanjut || 'belum ditindaklanjuti'}
+                        </div>
+                        {point.deskripsi && <div style={s.descBox}>{point.deskripsi}</div>}
+                      </>
+                    )}
+
+                    <div style={s.infoText}>
+                      <strong>Titik 1:</strong>{' '}
+                      {Number(point.lat).toFixed(6)}, {Number(point.lng).toFixed(6)}
+                    </div>
+
+                    <div style={s.infoText}>
+                      <strong>Radius input:</strong> {point.radius || MAX_RADIUS} m
+                    </div>
+
+                    <div style={s.areaActions}>
+                      <button type="button" style={s.darkBtn} onClick={() => editPoint(point)}>
+                        Edit
+                      </button>
+
+                      {point.jenis === 'masalah' && (
+                        <button type="button" style={s.greenBtn} onClick={() => sendReport(point.id)}>
+                          Kirim Laporan
+                        </button>
+                      )}
+
+                      <button type="button" style={s.redBtn} onClick={() => deletePoint(point.id)}>
+                        Hapus
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -631,279 +929,339 @@ export default function Digitasi({ onNavigate, token }) {
   );
 }
 
+function StatCard({ value, label }) {
+  return (
+    <div style={s.statCard}>
+      <div style={s.statValue}>{value}</div>
+      <div style={s.statLabel}>{label}</div>
+    </div>
+  );
+}
+
 const s = {
   page: {
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #040816 0%, #07111f 45%, #081625 100%)',
+    background: '#07110b',
     color: '#fff',
     padding: 24,
     fontFamily: 'Inter, system-ui, sans-serif',
   },
-  topBar: {
+  header: {
     display: 'flex',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
     gap: 18,
     flexWrap: 'wrap',
     marginBottom: 20,
-    alignItems: 'flex-start',
   },
   kicker: {
-    fontSize: 11,
+    fontSize: 12,
     letterSpacing: 2,
-    color: '#95a3b8',
+    color: 'rgba(255,255,255,0.6)',
     marginBottom: 8,
   },
   title: {
     margin: 0,
-    fontSize: 40,
+    fontSize: 42,
+    fontWeight: 900,
     letterSpacing: '-1px',
   },
-  desc: {
-    marginTop: 12,
-    color: 'rgba(255,255,255,0.68)',
+  subtitle: {
+    color: 'rgba(255,255,255,0.72)',
+    maxWidth: 850,
     lineHeight: 1.8,
-    maxWidth: 700,
   },
-  summaryGrid: {
+  backBtn: {
+    padding: '12px 16px',
+    borderRadius: 14,
+    border: '1px solid rgba(255,255,255,0.08)',
+    background: '#13261b',
+    color: '#fff',
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
+  statsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(2, minmax(0,1fr))',
-    gap: 16,
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    gap: 14,
     marginBottom: 18,
   },
-  summaryCard: {
-    padding: 20,
-    borderRadius: 22,
+  statCard: {
+    background: '#102017',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: 20,
+    padding: 18,
   },
-  summaryValue: {
-    fontSize: 38,
-    fontWeight: 800,
+  statValue: {
+    fontSize: 36,
+    fontWeight: 900,
     color: '#4ade80',
   },
-  summaryLabel: {
-    marginTop: 8,
+  statLabel: {
     color: 'rgba(255,255,255,0.62)',
+    marginTop: 6,
   },
   layout: {
     display: 'grid',
-    gridTemplateColumns: '430px 1fr',
+    gridTemplateColumns: '420px 1fr',
     gap: 16,
   },
-  leftCol: {
+  left: {
     display: 'flex',
     flexDirection: 'column',
     gap: 16,
   },
-  rightCol: {
+  right: {
     display: 'flex',
     flexDirection: 'column',
     gap: 16,
   },
   card: {
-    padding: 22,
+    background: '#102017',
+    border: '1px solid rgba(255,255,255,0.08)',
     borderRadius: 22,
+    padding: 20,
   },
-  cardTitle: {
-    marginTop: 0,
+  actionTop: {
+    display: 'flex',
+    gap: 10,
+    flexWrap: 'wrap',
     marginBottom: 14,
-    fontSize: 24,
   },
-  controlRow: {
-    display: 'flex',
-    gap: 10,
-    marginBottom: 16,
-    flexWrap: 'wrap',
-  },
-  helperBox: {
-    padding: 14,
-    borderRadius: 16,
-    background: 'rgba(96,165,250,0.08)',
-    border: '1px solid rgba(96,165,250,0.14)',
-    color: 'rgba(255,255,255,0.72)',
-    lineHeight: 1.8,
-    marginBottom: 16,
-  },
-  label: {
-    display: 'block',
-    marginTop: 14,
-    marginBottom: 8,
-    color: 'rgba(255,255,255,0.82)',
-    fontWeight: 600,
-  },
-  input: {
-    width: '100%',
-    padding: '14px 16px',
-    borderRadius: 16,
-    border: '1px solid rgba(255,255,255,0.08)',
-    background: 'rgba(255,255,255,0.045)',
-    color: '#fff',
-    outline: 'none',
-  },
-  textarea: {
-    width: '100%',
-    minHeight: 120,
-    resize: 'vertical',
-    padding: '14px 16px',
-    borderRadius: 16,
-    border: '1px solid rgba(255,255,255,0.08)',
-    background: 'rgba(255,255,255,0.045)',
-    color: '#fff',
-    outline: 'none',
-    fontFamily: 'inherit',
-  },
-  radiusRow: {
-    display: 'flex',
-    gap: 8,
-    flexWrap: 'wrap',
-    marginBottom: 10,
-  },
-  radiusBtn: {
-    padding: '9px 12px',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 999,
-    cursor: 'pointer',
-    fontWeight: 700,
-  },
-  coordBox: {
-    marginTop: 14,
-    marginBottom: 16,
-    padding: 14,
-    borderRadius: 16,
-    background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(255,255,255,0.06)',
-    color: 'rgba(255,255,255,0.74)',
-    lineHeight: 1.8,
-  },
-  coordTitle: {
-    fontWeight: 700,
-    marginBottom: 6,
-  },
-  pointItem: {
-    padding: '14px 0',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
-  },
-  pointTop: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 14,
-    flexWrap: 'wrap',
-    alignItems: 'flex-start',
-  },
-  pointTitle: {
-    fontWeight: 700,
-    fontSize: 17,
-  },
-  pointMeta: {
-    marginTop: 6,
-    color: 'rgba(255,255,255,0.56)',
-    fontSize: 14,
-    lineHeight: 1.8,
-  },
-  typeBadge: {
-    display: 'inline-block',
-    padding: '5px 10px',
-    borderRadius: 999,
-    background: 'rgba(96,165,250,0.12)',
-    border: '1px solid rgba(96,165,250,0.2)',
-    color: '#93c5fd',
-    fontSize: 12,
-    fontWeight: 700,
-    marginRight: 8,
-  },
-  pointInfo: {
-    marginTop: 8,
-    color: 'rgba(255,255,255,0.78)',
-  },
-  descBox: {
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 14,
-    background: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(255,255,255,0.06)',
-    color: 'rgba(255,255,255,0.72)',
-    lineHeight: 1.8,
-  },
-  actionRow: {
-    display: 'flex',
-    gap: 10,
-    marginTop: 14,
-    flexWrap: 'wrap',
-  },
-  simpleBadge: {
-    minWidth: 86,
-    textAlign: 'center',
-    padding: '10px 14px',
-    borderRadius: 999,
-    background: 'linear-gradient(135deg, rgba(124,58,237,0.22) 0%, rgba(168,85,247,0.16) 100%)',
-    color: '#d8b4fe',
-    border: '1px solid rgba(168,85,247,0.22)',
-    fontSize: 13,
-    fontWeight: 800,
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
-  },
-  empty: {
-    color: 'rgba(255,255,255,0.38)',
-    padding: '20px 0',
-  },
-  primaryBtn: {
-    padding: '12px 16px',
-    borderRadius: 14,
+  greenBtn: {
+    padding: '11px 14px',
+    borderRadius: 13,
     border: 'none',
-    background: '#16a34a',
+    background: '#1f5c3f',
+    color: '#fff',
+    cursor: 'pointer',
+    fontWeight: 800,
+  },
+  darkBtn: {
+    padding: '11px 14px',
+    borderRadius: 13,
+    border: '1px solid rgba(255,255,255,0.08)',
+    background: '#13261b',
     color: '#fff',
     cursor: 'pointer',
     fontWeight: 700,
   },
-  secondaryBtn: {
-    padding: '12px 16px',
-    borderRadius: 14,
+  fullDarkBtn: {
+    width: '100%',
+    padding: '12px 14px',
+    borderRadius: 13,
     border: '1px solid rgba(255,255,255,0.08)',
-    background: 'rgba(255,255,255,0.04)',
+    background: '#13261b',
     color: '#fff',
     cursor: 'pointer',
-    fontWeight: 600,
+    fontWeight: 800,
   },
-  dangerBtn: {
-    padding: '12px 16px',
-    borderRadius: 14,
+  redBtn: {
+    padding: '11px 14px',
+    borderRadius: 13,
+    border: 'none',
+    background: '#991b1b',
+    color: '#fff',
+    cursor: 'pointer',
+    fontWeight: 800,
+  },
+  redSmallBtn: {
+    padding: '8px 10px',
+    borderRadius: 10,
     border: 'none',
     background: '#991b1b',
     color: '#fff',
     cursor: 'pointer',
     fontWeight: 700,
   },
+  notice: {
+    background: '#13261b',
+    border: '1px solid rgba(255,255,255,0.06)',
+    borderRadius: 16,
+    padding: 14,
+    color: 'rgba(255,255,255,0.72)',
+    lineHeight: 1.7,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    margin: '0 0 14px',
+    fontSize: 24,
+    fontWeight: 900,
+  },
+  label: {
+    display: 'block',
+    marginTop: 14,
+    marginBottom: 7,
+    fontWeight: 700,
+    color: 'rgba(255,255,255,0.82)',
+  },
+  input: {
+    width: '100%',
+    padding: '13px 14px',
+    borderRadius: 14,
+    border: '1px solid rgba(255,255,255,0.08)',
+    background: '#13261b',
+    color: '#fff',
+    outline: 'none',
+  },
+  textarea: {
+    width: '100%',
+    minHeight: 110,
+    padding: '13px 14px',
+    borderRadius: 14,
+    border: '1px solid rgba(255,255,255,0.08)',
+    background: '#13261b',
+    color: '#fff',
+    outline: 'none',
+    resize: 'vertical',
+    fontFamily: 'inherit',
+  },
+  manualBox: {
+    marginTop: 14,
+    padding: 14,
+    borderRadius: 16,
+    background: '#0c1a12',
+    border: '1px solid rgba(255,255,255,0.06)',
+  },
+  manualTitle: {
+    fontWeight: 800,
+    marginBottom: 6,
+  },
+  manualHint: {
+    color: 'rgba(255,255,255,0.58)',
+    fontSize: 13,
+    marginBottom: 10,
+  },
+  manualGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: 10,
+    marginBottom: 10,
+  },
+  polygonInfo: {
+    marginTop: 14,
+    padding: 14,
+    borderRadius: 16,
+    background: '#0c1a12',
+    border: '1px solid rgba(255,255,255,0.06)',
+    color: 'rgba(255,255,255,0.72)',
+    lineHeight: 1.8,
+  },
+  pointList: {
+    marginTop: 14,
+    display: 'grid',
+    gap: 10,
+  },
+  pointDraft: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 10,
+    alignItems: 'center',
+    background: '#13261b',
+    border: '1px solid rgba(255,255,255,0.06)',
+    borderRadius: 14,
+    padding: 12,
+  },
+  pointDraftTitle: {
+    fontWeight: 800,
+  },
+  smallText: {
+    color: 'rgba(255,255,255,0.58)',
+    marginTop: 4,
+    fontSize: 13,
+  },
+  saveBtn: {
+    width: '100%',
+    marginTop: 16,
+    padding: '14px 16px',
+    borderRadius: 14,
+    border: 'none',
+    background: '#1f5c3f',
+    color: '#fff',
+    cursor: 'pointer',
+    fontWeight: 900,
+  },
+  empty: {
+    color: 'rgba(255,255,255,0.5)',
+    padding: 16,
+  },
+  areaItem: {
+    padding: '16px 0',
+    borderBottom: '1px solid rgba(255,255,255,0.06)',
+  },
+  areaTop: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  areaTitle: {
+    fontSize: 18,
+    fontWeight: 900,
+  },
+  areaMeta: {
+    marginTop: 6,
+    color: 'rgba(255,255,255,0.56)',
+  },
+  badge: {
+    height: 'fit-content',
+    padding: '8px 12px',
+    borderRadius: 999,
+    background: 'rgba(31,92,63,0.2)',
+    border: '1px solid rgba(31,92,63,0.4)',
+    color: '#fff',
+    fontWeight: 800,
+    fontSize: 13,
+  },
+  infoText: {
+    marginTop: 9,
+    color: 'rgba(255,255,255,0.78)',
+  },
+  descBox: {
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 14,
+    background: '#13261b',
+    color: 'rgba(255,255,255,0.72)',
+    lineHeight: 1.7,
+  },
+  areaActions: {
+    display: 'flex',
+    gap: 10,
+    flexWrap: 'wrap',
+    marginTop: 14,
+  },
 };
 
 const css = `
-  * { box-sizing: border-box; }
-
-  .glass {
-    background: rgba(10,18,35,0.86);
-    border: 1px solid rgba(255,255,255,0.08);
-    backdrop-filter: blur(14px);
-    box-shadow: 0 18px 60px rgba(0,0,0,0.24);
-  }
-
-  input::placeholder,
-  textarea::placeholder {
-    color: rgba(255,255,255,0.28);
+  * {
+    box-sizing: border-box;
   }
 
   select,
   option {
-    background: #101a2d;
-    color: #ffffff;
+    background: #13261b;
+    color: #fff;
   }
 
-  select:focus,
-  input:focus,
-  textarea:focus {
-    border-color: rgba(96,165,250,0.35);
-    box-shadow: 0 0 0 3px rgba(96,165,250,0.08);
+  input::placeholder,
+  textarea::placeholder {
+    color: rgba(255,255,255,.32);
   }
 
-  @media (max-width: 980px) {
-    div[style*="grid-template-columns: repeat(2, minmax(0,1fr))"],
-    div[style*="grid-template-columns: 430px 1fr"] {
+  .leaflet-container {
+    background: #13261b;
+  }
+
+  @media (max-width: 1100px) {
+    div[style*="grid-template-columns: 420px 1fr"],
+    div[style*="grid-template-columns: repeat(3, 1fr)"] {
+      grid-template-columns: 1fr !important;
+    }
+  }
+
+  @media (max-width: 620px) {
+    div[style*="grid-template-columns: 1fr 1fr"] {
       grid-template-columns: 1fr !important;
     }
   }

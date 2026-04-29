@@ -11,33 +11,52 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
+const colors = {
+  bg: '#06140d',
+  bg2: '#071b11',
+  sidebar: '#071c12',
+  panel: '#0b2417',
+  panel2: '#0f2d1d',
+  panel3: '#113522',
+  line: 'rgba(148, 212, 157, 0.14)',
+  lineStrong: 'rgba(148, 212, 157, 0.28)',
+  text: '#E3FED3',
+  muted: 'rgba(227,254,211,0.58)',
+  soft: '#E3FED3',
+  pastel: '#94D49D',
+  medium: '#46AB68',
+  dark: '#028739',
+  danger: '#ef4444',
+};
+
+const EMPTY_FORM = {
+  pointId: '',
+  pointName: '',
+  lokasi: '',
+  daerah: '',
+  radius: '',
+  lat: '',
+  lng: '',
+  n: '',
+  p: '',
+  k: '',
+  mg: '',
+  nSource: '',
+  pSource: '',
+  kSource: '',
+  mgSource: '',
+  umur: '',
+  luas: '',
+  protas: '',
+  jumlahPohon: '',
+};
+
 export default function AnalisisTanah({ token, onNavigate }) {
   const [points, setPoints] = useState([]);
   const [history, setHistory] = useState([]);
   const [result, setResult] = useState(null);
   const [selectedHistoryId, setSelectedHistoryId] = useState(null);
-
-  const [form, setForm] = useState({
-    pointId: '',
-    pointName: '',
-    lokasi: '',
-    daerah: '',
-    radius: '',
-    lat: '',
-    lng: '',
-    n: '',
-    p: '',
-    k: '',
-    mg: '',
-    nSource: '',
-    pSource: '',
-    kSource: '',
-    mgSource: '',
-    umur: '',
-    luas: '',
-    protas: '',
-    jumlahPohon: '',
-  });
+  const [form, setForm] = useState(EMPTY_FORM);
 
   const loadPoints = async () => {
     try {
@@ -62,12 +81,10 @@ export default function AnalisisTanah({ token, onNavigate }) {
     loadHistory();
   }, [token]);
 
-  const buildRecommendationsFromHistory = () => {
-    return [
-      'Hasil ini berasal dari analisis yang sudah tersimpan.',
-      'Lakukan evaluasi ulang setelah aplikasi II untuk memastikan respon tanaman.',
-    ];
-  };
+  const buildRecommendationsFromHistory = () => [
+    'Hasil ini berasal dari analisis yang sudah tersimpan.',
+    'Lakukan evaluasi ulang setelah aplikasi II untuk memastikan respon tanaman.',
+  ];
 
   const buildResultFromHistory = (row) => ({
     summary: {
@@ -94,27 +111,7 @@ export default function AnalisisTanah({ token, onNavigate }) {
 
   const handleSelectPoint = async (pointId) => {
     if (!pointId) {
-      setForm({
-        pointId: '',
-        pointName: '',
-        lokasi: '',
-        daerah: '',
-        radius: '',
-        lat: '',
-        lng: '',
-        n: '',
-        p: '',
-        k: '',
-        mg: '',
-        nSource: '',
-        pSource: '',
-        kSource: '',
-        mgSource: '',
-        umur: '',
-        luas: '',
-        protas: '',
-        jumlahPohon: '',
-      });
+      setForm(EMPTY_FORM);
       setResult(null);
       setSelectedHistoryId(null);
       return;
@@ -252,10 +249,13 @@ export default function AnalisisTanah({ token, onNavigate }) {
     return s.sourceDefault;
   };
 
-  const totalPupuk = (a, b) => (Number(a) + Number(b)).toFixed(2).replace(/\.00$/, '');
+  const totalPupuk = (a, b) => {
+    return (Number(a) + Number(b)).toFixed(2).replace(/\.00$/, '');
+  };
 
   const formatDate = (value) => {
     if (!value) return '-';
+
     return new Date(value).toLocaleString('id-ID', {
       day: '2-digit',
       month: 'long',
@@ -271,222 +271,280 @@ export default function AnalisisTanah({ token, onNavigate }) {
   const hasMap = !Number.isNaN(mapLat) && !Number.isNaN(mapLng) && mapLat && mapLng;
 
   return (
-    <div style={s.page}>
+    <div style={s.shell}>
       <style>{css}</style>
 
-      <header style={s.topbar}>
+      <aside style={s.sidebar}>
         <div>
-          <div style={s.eyebrow}>ANALISIS TANAH</div>
-          <h1 style={s.title}>Perhitungan Dosis Berbasis Titik & Radius</h1>
-          <p style={s.subtitle}>
-            Analisis kandungan daun berdasarkan titik lahan, lalu hitung rekomendasi dosis pupuk
-            dengan tampilan yang lebih fokus, rapi, dan mudah dibaca.
-          </p>
+          <div style={s.logoBox}>
+            <img src="/ppks.png" alt="PPKS" style={s.logo} />
+            <div>
+              <div style={s.logoText}>SoilMap</div>
+              <div style={s.logoSub}>Nutrient System</div>
+            </div>
+          </div>
+
+          <nav style={s.nav}>
+            <button style={s.navItem} onClick={() => onNavigate('user-dashboard')}>
+              <span>▦</span>
+              Dashboard
+            </button>
+
+            <button style={s.navItem} onClick={() => onNavigate('map')}>
+              <span>◫</span>
+              Map
+            </button>
+
+            <button style={s.navItem} onClick={() => onNavigate('digitasi')}>
+              <span>◇</span>
+              Digitization
+            </button>
+
+            <button style={s.navItem} onClick={() => onNavigate('laporan')}>
+              <span>▣</span>
+              Reports
+            </button>
+
+            <button style={{ ...s.navItem, ...s.navItemActive }}>
+              <span>⚗</span>
+              Soil Analysis
+            </button>
+          </nav>
         </div>
 
-        <button style={s.backButton} onClick={() => onNavigate('user-dashboard')}>
-          ← Dashboard User
-        </button>
-      </header>
+        <div style={s.sidebarBottom}>
+          <button style={s.newBtn} onClick={() => onNavigate('digitasi')}>
+            New Field Report
+          </button>
 
-      <main style={s.mainGrid}>
-        <aside style={s.sidebar}>
-          <section style={s.panel}>
-            <div style={s.panelHeader}>
-              <div style={s.panelTag}>TITIK</div>
-              <h3 style={s.panelTitle}>Pemilihan Lahan</h3>
-            </div>
+          <button style={s.sideSmallBtn} onClick={() => onNavigate('user-dashboard')}>
+            ← Back Dashboard
+          </button>
+        </div>
+      </aside>
 
-            <label style={s.label}>Pilih Titik/Lahan</label>
-            <select
-              style={s.input}
-              value={form.pointId}
-              onChange={(e) => handleSelectPoint(e.target.value)}
-            >
-              <option value="">Pilih titik</option>
-              {points.map((point) => (
-                <option key={point.id} value={point.id}>
-                  {point.nama} - {point.lokasi || '-'} - {point.daerah || '-'}
-                </option>
-              ))}
-            </select>
+      <main style={s.main}>
+        <div style={s.searchRow}>
+          <input style={s.searchInput} placeholder="Search parameters..." />
 
-            <div style={s.metaStack}>
-              <MetaCard label="Nama Titik" value={form.pointName} />
-              <MetaCard label="Lokasi" value={form.lokasi} />
-              <MetaCard label="Daerah" value={form.daerah} />
-              <MetaCard label="Radius Area" value={form.radius ? `${form.radius} m` : '-'} />
-              <MetaCard
-                label="Koordinat"
-                value={hasMap ? `${mapLat.toFixed(6)}, ${mapLng.toFixed(6)}` : '-'}
-              />
-            </div>
-          </section>
+          <select
+            style={s.topSelect}
+            value={form.pointId}
+            onChange={(e) => handleSelectPoint(e.target.value)}
+          >
+            <option value="">Pilih Titik/Lahan</option>
+            {points.map((point) => (
+              <option key={point.id} value={point.id}>
+                {point.nama} - {point.lokasi || '-'} - {point.daerah || '-'}
+              </option>
+            ))}
+          </select>
+        </div>
 
-          <section style={s.panel}>
-            <div style={s.panelHeader}>
-              <div style={s.panelTag}>PETA TITIK</div>
-              <h3 style={s.panelTitle}>Lokasi Lahan</h3>
-            </div>
+        <header style={s.header}>
+          <div>
+            <div style={s.eyebrow}>SOIL ANALYSIS REPORT</div>
+            <h1 style={s.title}>Analisis Kandungan Tanah</h1>
+            <p style={s.subtitle}>
+              Real-time nutrient concentration monitoring, spatial tracking, and fertilizer
+              recommendation history.
+            </p>
+          </div>
 
-            {!hasMap ? (
-              <div style={s.emptyState}>Pilih titik untuk menampilkan lokasi pada peta.</div>
-            ) : (
-              <div style={s.mapWrap}>
-                <MapContainer
-                  center={[mapLat, mapLng]}
-                  zoom={15}
-                  scrollWheelZoom={false}
-                  style={{ height: '280px', width: '100%', borderRadius: '18px' }}
-                >
-                  <TileLayer
-                    attribution='&copy; OpenStreetMap'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-                  <Marker position={[mapLat, mapLng]}>
-                    <Popup>
-                      <strong>{form.pointName}</strong>
-                      <br />
-                      {form.lokasi} - {form.daerah}
-                    </Popup>
-                  </Marker>
-                  {mapRadius > 0 && (
-                    <Circle
-                      center={[mapLat, mapLng]}
-                      radius={mapRadius}
-                      pathOptions={{
-                        color: '#1f5c3f',
-                        fillColor: '#1f5c3f',
-                        fillOpacity: 0.15,
-                      }}
-                    />
-                  )}
-                </MapContainer>
-              </div>
-            )}
-          </section>
+          <button style={s.backBtn} onClick={() => onNavigate('user-dashboard')}>
+            ← Dashboard User
+          </button>
+        </header>
 
-          <section style={s.panel}>
-            <div style={s.panelHeader}>
-              <div style={s.panelTag}>KANDUNGAN</div>
-              <h3 style={s.panelTitle}>Kandungan Daun (%)</h3>
-            </div>
-
-            <div style={s.nutrientGrid}>
-              <NutrientBlock
-                name="Nitrogen (N)"
-                value={form.n || '-'}
-                source={formatSourceLabel(form.nSource)}
-                sourceStyle={sourceTone(form.nSource)}
-              />
-              <NutrientBlock
-                name="Fosfor (P)"
-                value={form.p || '-'}
-                source={formatSourceLabel(form.pSource)}
-                sourceStyle={sourceTone(form.pSource)}
-              />
-              <NutrientBlock
-                name="Kalium (K)"
-                value={form.k || '-'}
-                source={formatSourceLabel(form.kSource)}
-                sourceStyle={sourceTone(form.kSource)}
-              />
-              <NutrientBlock
-                name="Magnesium (Mg)"
-                value={form.mg || '-'}
-                source={formatSourceLabel(form.mgSource)}
-                sourceStyle={sourceTone(form.mgSource)}
-              />
-            </div>
-
-            <div style={s.helperNote}>
-              N dan Mg dibaca otomatis dari GeoJSON sesuai lokasi titik. P dan K sementara
-              memakai nilai default sistem sampai file GeoJSON tersedia.
-            </div>
-          </section>
-
-          <section style={s.panel}>
-            <div style={s.panelHeader}>
-              <div style={s.panelTag}>PRODUKSI</div>
-              <h3 style={s.panelTitle}>Input Parameter</h3>
-            </div>
-
-            <label style={s.label}>Umur</label>
-            <input
-              style={s.input}
-              value={form.umur}
-              onChange={(e) => setForm({ ...form, umur: e.target.value })}
-            />
-
-            <label style={s.label}>Luas</label>
-            <input
-              style={s.input}
-              value={form.luas}
-              onChange={(e) => setForm({ ...form, luas: e.target.value })}
-            />
-
-            <label style={s.label}>Protas</label>
-            <input
-              style={s.input}
-              value={form.protas}
-              onChange={(e) => setForm({ ...form, protas: e.target.value })}
-            />
-
-            <label style={s.label}>Jumlah Pohon</label>
-            <input
-              style={s.input}
-              value={form.jumlahPohon}
-              onChange={(e) => setForm({ ...form, jumlahPohon: e.target.value })}
-            />
-
-            <div style={s.actions}>
-              <button style={s.secondaryAction} onClick={hitung}>
-                Hitung
-              </button>
-              <button style={s.primaryAction} onClick={simpan}>
-                Hitung & Simpan
-              </button>
-            </div>
-          </section>
-        </aside>
-
-        <section style={s.content}>
-          <section style={s.heroResult}>
-            <div style={s.heroResultTop}>
-              <div>
-                <div style={s.panelTag}>HASIL</div>
-                <h3 style={s.resultTitle}>Ringkasan Analisis</h3>
-              </div>
-
-              {selectedHistoryId && <div style={s.savedChip}>Data tersimpan</div>}
-            </div>
-
-            {!result ? (
-              <div style={s.emptyState}>
-                Belum ada hasil perhitungan. Pilih titik, isi parameter produksi, lalu klik
-                tombol hitung.
-              </div>
-            ) : (
-              <>
-                <div style={s.resultCards}>
-                  <ResultCard label="Aplikasi I" value={result.summary.aplikasi1_total} />
-                  <ResultCard label="Aplikasi II" value={result.summary.aplikasi2_total} />
-                  <ResultCard label="Total Rekomendasi" value={result.summary.total_rekomendasi} />
+        <section style={s.layout}>
+          <div style={s.left}>
+            <section style={s.panel}>
+              <div style={s.panelHeader}>
+                <div>
+                  <div style={s.panelTag}>KANDUNGAN DAUN (%)</div>
+                  <h3 style={s.panelTitle}>Nutrient Concentration</h3>
                 </div>
 
-                <div style={s.resultSplit}>
-                  <div style={s.tableWrap}>
-                    <div style={s.blockTitle}>Rincian Per Jenis Pupuk</div>
+                <div style={s.updateText}>
+                  Last update: {new Date().toLocaleDateString('id-ID')}
+                </div>
+              </div>
 
+              <div style={s.nutrientGrid}>
+                <NutrientBlock
+                  name="Nitrogen (N)"
+                  value={form.n || '-'}
+                  source={formatSourceLabel(form.nSource)}
+                  sourceStyle={sourceTone(form.nSource)}
+                />
+
+                <NutrientBlock
+                  name="Phosphor (P)"
+                  value={form.p || '-'}
+                  source={formatSourceLabel(form.pSource)}
+                  sourceStyle={sourceTone(form.pSource)}
+                />
+
+                <NutrientBlock
+                  name="Kalium (K)"
+                  value={form.k || '-'}
+                  source={formatSourceLabel(form.kSource)}
+                  sourceStyle={sourceTone(form.kSource)}
+                />
+
+                <NutrientBlock
+                  name="Magnesium (Mg)"
+                  value={form.mg || '-'}
+                  source={formatSourceLabel(form.mgSource)}
+                  sourceStyle={sourceTone(form.mgSource)}
+                />
+              </div>
+            </section>
+
+            <section style={s.panel}>
+              <div style={s.panelHeader}>
+                <div>
+                  <div style={s.panelTag}>SPATIAL DISTRIBUTION MAP</div>
+                  <h3 style={s.panelTitle}>Lokasi Titik Lahan</h3>
+                </div>
+
+                {hasMap && (
+                  <div style={s.updateText}>
+                    Radius {mapRadius || 0} m
+                  </div>
+                )}
+              </div>
+
+              {!hasMap ? (
+                <div style={s.emptyMap}>
+                  <div style={s.emptyIcon}>▧</div>
+                  <div style={s.emptyTitle}>No Active Location</div>
+                  <div style={s.emptyText}>
+                    Pilih titik/lahan terlebih dahulu untuk menampilkan lokasi pada peta.
+                  </div>
+                </div>
+              ) : (
+                <div style={s.mapWrap}>
+                  <MapContainer
+                    center={[mapLat, mapLng]}
+                    zoom={15}
+                    scrollWheelZoom={false}
+                    style={{ height: 300, width: '100%' }}
+                  >
+                    <TileLayer
+                      attribution="&copy; OpenStreetMap"
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+
+                    <Marker position={[mapLat, mapLng]}>
+                      <Popup>
+                        <strong>{form.pointName}</strong>
+                        <br />
+                        {form.lokasi} - {form.daerah}
+                      </Popup>
+                    </Marker>
+
+                    {mapRadius > 0 && (
+                      <Circle
+                        center={[mapLat, mapLng]}
+                        radius={mapRadius}
+                        pathOptions={{
+                          color: colors.medium,
+                          fillColor: colors.medium,
+                          fillOpacity: 0.16,
+                        }}
+                      />
+                    )}
+                  </MapContainer>
+
+                  <div style={s.coordBadge}>
+                    LAT: {mapLat.toFixed(5)} | LONG: {mapLng.toFixed(5)}
+                  </div>
+                </div>
+              )}
+            </section>
+
+            <section style={s.panel}>
+              <div style={s.panelHeader}>
+                <div>
+                  <div style={s.panelTag}>INPUT PARAMETER</div>
+                  <h3 style={s.panelTitle}>Production Parameters</h3>
+                </div>
+              </div>
+
+              <div style={s.inputGrid}>
+                <InputField
+                  label="Umur"
+                  value={form.umur}
+                  onChange={(value) => setForm({ ...form, umur: value })}
+                />
+
+                <InputField
+                  label="Luas"
+                  value={form.luas}
+                  onChange={(value) => setForm({ ...form, luas: value })}
+                />
+
+                <InputField
+                  label="Protas"
+                  value={form.protas}
+                  onChange={(value) => setForm({ ...form, protas: value })}
+                />
+
+                <InputField
+                  label="Jumlah Pohon"
+                  value={form.jumlahPohon}
+                  onChange={(value) => setForm({ ...form, jumlahPohon: value })}
+                />
+              </div>
+
+              <div style={s.actions}>
+                <button style={s.outlineAction} onClick={hitung}>
+                  Calculate
+                </button>
+
+                <button style={s.primaryAction} onClick={simpan}>
+                  Calculate & Save
+                </button>
+              </div>
+            </section>
+          </div>
+
+          <div style={s.right}>
+            <section style={s.panel}>
+              <div style={s.panelHeader}>
+                <div>
+                  <div style={s.panelTag}>ANALYSIS SUMMARY</div>
+                  <h3 style={s.panelTitleSmall}>Result Overview</h3>
+                </div>
+
+                {selectedHistoryId && <span style={s.savedChip}>Saved</span>}
+              </div>
+
+              {!result ? (
+                <EmptyState
+                  title="No Active Analysis"
+                  text="Run a new field test or select a saved analysis to generate fertilizer summary."
+                />
+              ) : (
+                <>
+                  <div style={s.resultGrid}>
+                    <ResultCard label="App I" value={result.summary.aplikasi1_total} />
+                    <ResultCard label="App II" value={result.summary.aplikasi2_total} />
+                    <ResultCard label="Total" value={result.summary.total_rekomendasi} />
+                  </div>
+
+                  <div style={s.tableBox}>
                     <table style={s.table}>
                       <thead>
                         <tr>
                           <th>Pupuk</th>
-                          <th>Aplikasi I</th>
-                          <th>Aplikasi II</th>
+                          <th>I</th>
+                          <th>II</th>
                           <th>Total</th>
                         </tr>
                       </thead>
+
                       <tbody>
                         <tr>
                           <td>Urea</td>
@@ -494,24 +552,30 @@ export default function AnalisisTanah({ token, onNavigate }) {
                           <td>{result.aplikasi2.urea}</td>
                           <td>{totalPupuk(result.aplikasi1.urea, result.aplikasi2.urea)}</td>
                         </tr>
+
                         <tr>
                           <td>TSP</td>
                           <td>{result.aplikasi1.tsp}</td>
                           <td>{result.aplikasi2.tsp}</td>
                           <td>{totalPupuk(result.aplikasi1.tsp, result.aplikasi2.tsp)}</td>
                         </tr>
+
                         <tr>
                           <td>KCl</td>
                           <td>{result.aplikasi1.kcl}</td>
                           <td>{result.aplikasi2.kcl}</td>
                           <td>{totalPupuk(result.aplikasi1.kcl, result.aplikasi2.kcl)}</td>
                         </tr>
+
                         <tr>
                           <td>Dolomit</td>
                           <td>{result.aplikasi1.dolomit}</td>
                           <td>{result.aplikasi2.dolomit}</td>
-                          <td>{totalPupuk(result.aplikasi1.dolomit, result.aplikasi2.dolomit)}</td>
+                          <td>
+                            {totalPupuk(result.aplikasi1.dolomit, result.aplikasi2.dolomit)}
+                          </td>
                         </tr>
+
                         <tr style={s.totalRow}>
                           <td>Total</td>
                           <td>{result.summary.aplikasi1_total}</td>
@@ -522,109 +586,87 @@ export default function AnalisisTanah({ token, onNavigate }) {
                     </table>
                   </div>
 
-                  <div style={s.recommendPanel}>
-                    <div style={s.blockTitle}>Rekomendasi Tindakan</div>
-                    <div style={s.recommendList}>
-                      {result.recommendations?.length ? (
-                        result.recommendations.map((item, idx) => (
-                          <div key={idx} style={s.recommendItem}>
-                            <span style={s.recommendIndex}>{idx + 1}</span>
-                            <span>{item}</span>
-                          </div>
-                        ))
-                      ) : (
-                        <div style={s.emptySmall}>Belum ada rekomendasi.</div>
-                      )}
-                    </div>
+                  <div style={s.recommendBox}>
+                    <div style={s.panelTag}>RECOMMENDATION</div>
+
+                    {result.recommendations?.length ? (
+                      result.recommendations.map((item, index) => (
+                        <div key={index} style={s.recommendItem}>
+                          <span>{index + 1}</span>
+                          <p>{item}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <div style={s.emptyText}>Belum ada rekomendasi.</div>
+                    )}
                   </div>
+                </>
+              )}
+            </section>
+
+            <section style={s.panel}>
+              <div style={s.panelHeader}>
+                <div>
+                  <div style={s.panelTag}>ANALYSIS HISTORY</div>
+                  <h3 style={s.panelTitleSmall}>Tracking Record</h3>
                 </div>
-              </>
-            )}
-          </section>
-
-          <section style={s.historySection}>
-            <div style={s.historyHeader}>
-              <div>
-                <div style={s.panelTag}>RIWAYAT</div>
-                <h3 style={s.resultTitle}>
-                  {form.pointName ? `Riwayat Analisis - ${form.pointName}` : 'Riwayat Analisis'}
-                </h3>
               </div>
-            </div>
 
-            {!form.pointId ? (
-              <div style={s.emptyState}>Pilih titik/lahan terlebih dahulu untuk melihat riwayat analisis.</div>
-            ) : filteredHistory.length === 0 ? (
-              <div style={s.emptyState}>Belum ada riwayat analisis untuk titik yang dipilih.</div>
-            ) : (
-              <div style={s.historyList}>
-                {filteredHistory.map((item) => (
-                  <div
-                    key={item.id}
-                    style={{
-                      ...s.historyCard,
-                      ...(selectedHistoryId === item.id ? s.historyCardActive : {}),
-                    }}
-                  >
-                    <div style={s.historyCardTop}>
-                      <div>
-                        <div style={s.historyName}>{item.point_name || 'Tanpa titik'}</div>
-                        <div style={s.historyMeta}>
-                          {item.lokasi || '-'} · {item.daerah || '-'} · Radius {item.radius || 0} m
+              {!form.pointId ? (
+                <EmptyState
+                  title="Records Empty"
+                  text="Select field point to show analysis history."
+                  compact
+                />
+              ) : filteredHistory.length === 0 ? (
+                <EmptyState
+                  title="Records Empty"
+                  text="No history for selected field point."
+                  compact
+                />
+              ) : (
+                <div style={s.historyList}>
+                  {filteredHistory.map((item) => (
+                    <div
+                      key={item.id}
+                      style={{
+                        ...s.historyCard,
+                        ...(selectedHistoryId === item.id ? s.historyActive : {}),
+                      }}
+                    >
+                      <div style={s.historyTop}>
+                        <div>
+                          <div style={s.historyName}>{item.point_name || 'Tanpa titik'}</div>
+                          <div style={s.historyMeta}>{formatDate(item.created_at)}</div>
                         </div>
-                        <div style={s.historyDate}>
-                          Tanggal analisis: {formatDate(item.created_at)}
-                        </div>
+
+                        <button style={s.detailBtn} onClick={() => showHistoryDetail(item)}>
+                          Detail
+                        </button>
                       </div>
 
-                      <button style={s.detailBtn} onClick={() => showHistoryDetail(item)}>
-                        Lihat Detail
-                      </button>
+                      <div style={s.historyValue}>
+                        App I: {item.aplikasi1_total} | App II: {item.aplikasi2_total} | Total:{' '}
+                        {item.total_rekomendasi}
+                      </div>
                     </div>
-
-                    <div style={s.historyMetrics}>
-                      <HistoryGroup
-                        title="Aplikasi I"
-                        data={[
-                          ['Urea', item.urea_app1],
-                          ['TSP', item.tsp_app1],
-                          ['KCl', item.kcl_app1],
-                          ['Dolomit', item.dolomit_app1],
-                          ['Total', item.aplikasi1_total],
-                        ]}
-                      />
-                      <HistoryGroup
-                        title="Aplikasi II"
-                        data={[
-                          ['Urea', item.urea_app2],
-                          ['TSP', item.tsp_app2],
-                          ['KCl', item.kcl_app2],
-                          ['Dolomit', item.dolomit_app2],
-                          ['Total', item.aplikasi2_total],
-                        ]}
-                      />
-                    </div>
-
-                    <div style={s.historyFooter}>
-                      Total Rekomendasi: {item.total_rekomendasi}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+                  ))}
+                </div>
+              )}
+            </section>
+          </div>
         </section>
       </main>
     </div>
   );
 }
 
-function MetaCard({ label, value }) {
+function InputField({ label, value, onChange }) {
   return (
-    <div style={s.metaCard}>
-      <div style={s.metaLabel}>{label}</div>
-      <div style={s.metaValue}>{value || '-'}</div>
-    </div>
+    <label style={s.formGroup}>
+      <span>{label}</span>
+      <input style={s.input} value={value} onChange={(e) => onChange(e.target.value)} />
+    </label>
   );
 }
 
@@ -632,7 +674,12 @@ function NutrientBlock({ name, value, source, sourceStyle }) {
   return (
     <div style={s.nutrientCard}>
       <div style={s.nutrientName}>{name}</div>
-      <div style={s.nutrientValue}>{value}</div>
+
+      <div style={s.nutrientValue}>
+        {value}
+        {value !== '-' && <span>%</span>}
+      </div>
+
       <div style={{ ...s.sourcePill, ...sourceStyle }}>{source}</div>
     </div>
   );
@@ -641,369 +688,423 @@ function NutrientBlock({ name, value, source, sourceStyle }) {
 function ResultCard({ label, value }) {
   return (
     <div style={s.resultCard}>
-      <div style={s.resultCardLabel}>{label}</div>
-      <div style={s.resultCardValue}>{value}</div>
+      <div style={s.resultLabel}>{label}</div>
+      <div style={s.resultValue}>{value}</div>
     </div>
   );
 }
 
-function HistoryGroup({ title, data }) {
+function EmptyState({ title, text, compact }) {
   return (
-    <div style={s.historyGroup}>
-      <div style={s.historyGroupTitle}>{title}</div>
-      <div style={s.historyGroupGrid}>
-        {data.map(([label, value]) => (
-          <div key={label} style={s.historyMetric}>
-            <div style={s.historyMetricLabel}>{label}</div>
-            <div style={s.historyMetricValue}>{value}</div>
-          </div>
-        ))}
-      </div>
+    <div style={compact ? s.emptyCompact : s.emptyState}>
+      <div style={s.emptyIcon}>▧</div>
+      <div style={s.emptyTitle}>{title}</div>
+      <div style={s.emptyText}>{text}</div>
     </div>
   );
 }
 
 const s = {
-  page: {
+  shell: {
     minHeight: '100vh',
-    padding: 28,
-    color: '#f8fafc',
+    display: 'grid',
+    gridTemplateColumns: '250px 1fr',
+    background: colors.bg,
+    color: colors.text,
     fontFamily: 'Inter, system-ui, sans-serif',
-    background: '#076935',
   },
 
-  topbar: {
+  sidebar: {
+    background: colors.sidebar,
+    borderRight: `1px solid ${colors.line}`,
+    padding: 22,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    minHeight: '100vh',
+  },
+
+  logoBox: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 34,
+  },
+
+  logo: {
+    width: 42,
+    height: 42,
+    borderRadius: 999,
+    background: '#fff',
+    padding: 4,
+  },
+
+  logoText: {
+    fontWeight: 900,
+    color: colors.soft,
+  },
+
+  logoSub: {
+    color: colors.muted,
+    fontSize: 11,
+    marginTop: 2,
+  },
+
+  nav: {
+    display: 'grid',
+    gap: 8,
+  },
+
+  navItem: {
+    width: '100%',
+    display: 'flex',
+    gap: 12,
+    alignItems: 'center',
+    border: 'none',
+    background: 'transparent',
+    color: colors.muted,
+    padding: '13px 12px',
+    textAlign: 'left',
+    cursor: 'pointer',
+    fontWeight: 800,
+    textTransform: 'uppercase',
+    fontSize: 12,
+    letterSpacing: 0.7,
+  },
+
+  navItemActive: {
+    background: 'rgba(70,171,104,0.14)',
+    color: colors.soft,
+    borderRight: `4px solid ${colors.medium}`,
+  },
+
+  sidebarBottom: {
+    display: 'grid',
+    gap: 14,
+  },
+
+  newBtn: {
+    border: 'none',
+    background: colors.medium,
+    color: '#04140c',
+    padding: '13px 14px',
+    fontWeight: 900,
+    cursor: 'pointer',
+    textTransform: 'uppercase',
+    fontSize: 12,
+    letterSpacing: 0.7,
+  },
+
+  sideSmallBtn: {
+    border: 'none',
+    background: 'transparent',
+    color: colors.muted,
+    textAlign: 'left',
+    cursor: 'pointer',
+    fontSize: 11,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+
+  main: {
+    padding: '18px 24px',
+    background: `linear-gradient(180deg, ${colors.bg2}, #06130d)`,
+    minWidth: 0,
+  },
+
+  searchRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 14,
+    marginBottom: 26,
+  },
+
+  searchInput: {
+    width: 270,
+    maxWidth: '100%',
+    background: '#07170f',
+    border: `1px solid ${colors.line}`,
+    color: colors.soft,
+    padding: '10px 13px',
+    outline: 'none',
+    fontSize: 12,
+  },
+
+  topSelect: {
+    width: 340,
+    maxWidth: '100%',
+    background: colors.panel,
+    border: `1px solid ${colors.line}`,
+    color: colors.soft,
+    padding: '10px 12px',
+    fontWeight: 900,
+    textTransform: 'uppercase',
+    outline: 'none',
+  },
+
+  header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    gap: 20,
-    flexWrap: 'wrap',
-    marginBottom: 28,
+    gap: 16,
+    marginBottom: 22,
   },
 
   eyebrow: {
+    color: colors.medium,
+    fontWeight: 900,
     fontSize: 12,
-    fontWeight: 700,
-    letterSpacing: 3,
-    color: 'rgba(248,250,252,0.65)',
-    marginBottom: 10,
+    letterSpacing: 1.2,
+    marginBottom: 6,
+    textTransform: 'uppercase',
   },
 
   title: {
     margin: 0,
-    fontSize: 52,
-    lineHeight: 1.04,
-    letterSpacing: '-1.5px',
-    fontWeight: 900,
-    color: '#ffffff',
-    maxWidth: 920,
+    color: colors.soft,
+    fontSize: 32,
+    letterSpacing: '-0.8px',
   },
 
   subtitle: {
-    marginTop: 16,
-    maxWidth: 820,
-    fontSize: 18,
-    lineHeight: 1.85,
-    color: 'rgba(255,255,255,0.72)',
+    color: colors.muted,
+    marginTop: 6,
+    lineHeight: 1.6,
+    maxWidth: 650,
   },
 
-  backButton: {
-    border: '1px solid rgba(255,255,255,0.08)',
-    background: '#13261b',
-    color: '#ffffff',
-    borderRadius: 16,
-    padding: '14px 18px',
-    fontWeight: 700,
+  backBtn: {
+    height: 40,
+    border: `1px solid ${colors.line}`,
+    background: 'transparent',
+    color: colors.soft,
     cursor: 'pointer',
+    padding: '0 12px',
+    fontWeight: 900,
   },
 
-  mainGrid: {
+  layout: {
     display: 'grid',
-    gridTemplateColumns: '390px 1fr',
-    gap: 22,
+    gridTemplateColumns: '1fr 380px',
+    gap: 18,
     alignItems: 'start',
   },
 
-  sidebar: {
-    display: 'flex',
-    flexDirection: 'column',
+  left: {
+    display: 'grid',
     gap: 18,
-    position: 'sticky',
-    top: 18,
   },
 
-  content: {
+  right: {
     display: 'grid',
-    gap: 20,
+    gap: 18,
+    alignContent: 'start',
   },
 
   panel: {
-    background: '#102017',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 24,
-    padding: 20,
-  },
-
-  heroResult: {
-    background: '#102017',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 28,
-    padding: 22,
+    background: colors.panel,
+    border: `1px solid ${colors.line}`,
+    padding: 18,
   },
 
   panelHeader: {
-    marginBottom: 14,
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 16,
   },
 
   panelTag: {
-    display: 'inline-block',
+    color: colors.medium,
     fontSize: 11,
-    letterSpacing: 2.2,
+    fontWeight: 900,
     textTransform: 'uppercase',
-    color: 'rgba(255,255,255,0.58)',
-    fontWeight: 700,
-    marginBottom: 8,
+    letterSpacing: 1,
+    marginBottom: 5,
   },
 
   panelTitle: {
     margin: 0,
-    fontSize: 23,
-    fontWeight: 800,
-    letterSpacing: '-0.3px',
-    color: '#f5f8f5',
+    color: colors.soft,
+    fontSize: 20,
   },
 
-  label: {
-    display: 'block',
-    marginTop: 14,
-    marginBottom: 8,
-    fontWeight: 700,
-    color: '#f2f6f2',
+  panelTitleSmall: {
+    margin: 0,
+    color: colors.soft,
+    fontSize: 16,
   },
 
-  input: {
-    width: '100%',
-    borderRadius: 16,
-    border: '1px solid rgba(255,255,255,0.08)',
-    background: '#13261b',
-    color: '#ffffff',
-    padding: '15px 16px',
-    fontSize: 15,
-    outline: 'none',
-  },
-
-  metaStack: {
-    display: 'grid',
-    gap: 12,
-    marginTop: 16,
-  },
-
-  metaCard: {
-    borderRadius: 18,
-    background: '#13261b',
-    border: '1px solid rgba(255,255,255,0.05)',
-    padding: 14,
-  },
-
-  metaLabel: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.56)',
-    marginBottom: 6,
-    fontWeight: 600,
-  },
-
-  metaValue: {
-    fontSize: 17,
-    fontWeight: 700,
-    color: '#ffffff',
-  },
-
-  mapWrap: {
-    marginTop: 10,
-    borderRadius: 18,
-    overflow: 'hidden',
-    border: '1px solid rgba(255,255,255,0.06)',
+  updateText: {
+    color: 'rgba(227,254,211,.32)',
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
 
   nutrientGrid: {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: 12,
+    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+    gap: 14,
   },
 
   nutrientCard: {
-    borderRadius: 20,
-    background: '#13261b',
-    border: '1px solid rgba(255,255,255,0.05)',
+    background: colors.panel2,
+    border: `1px solid ${colors.line}`,
     padding: 16,
-    minHeight: 148,
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'space-between',
+    minHeight: 128,
   },
 
   nutrientName: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.72)',
-    fontWeight: 600,
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: 900,
   },
 
   nutrientValue: {
+    marginTop: 16,
     fontSize: 34,
-    fontWeight: 900,
     lineHeight: 1,
-    color: '#ffffff',
-    letterSpacing: '-0.8px',
-    marginTop: 12,
-    marginBottom: 10,
+    fontWeight: 900,
+    color: '#fff',
   },
 
   sourcePill: {
-    width: 'fit-content',
-    padding: '6px 10px',
-    borderRadius: 999,
-    fontSize: 12,
-    fontWeight: 700,
-    border: '1px solid rgba(255,255,255,0.08)',
+    display: 'inline-block',
+    marginTop: 12,
+    padding: '5px 8px',
+    fontSize: 10,
+    fontWeight: 900,
+    textTransform: 'uppercase',
   },
 
   sourceGeo: {
-    background: 'rgba(31,92,63,0.22)',
-    color: '#ffffff',
-    border: '1px solid rgba(31,92,63,0.45)',
+    background: 'rgba(70,171,104,0.14)',
+    color: colors.pastel,
+    border: `1px solid ${colors.line}`,
   },
 
   sourceDefault: {
-    background: 'rgba(255,255,255,0.05)',
-    color: '#ffffff',
-    border: '1px solid rgba(255,255,255,0.12)',
+    background: 'rgba(227,254,211,0.06)',
+    color: colors.muted,
+    border: `1px solid ${colors.line}`,
   },
 
-  helperNote: {
-    marginTop: 16,
-    borderRadius: 18,
-    background: '#13261b',
-    border: '1px solid rgba(255,255,255,0.05)',
-    padding: 16,
-    color: 'rgba(255,255,255,0.72)',
-    lineHeight: 1.8,
+  mapWrap: {
+    position: 'relative',
+    overflow: 'hidden',
+    border: `1px solid ${colors.line}`,
+    filter: 'saturate(.65) brightness(.86)',
+  },
+
+  coordBadge: {
+    position: 'absolute',
+    left: 14,
+    bottom: 14,
+    background: colors.panel,
+    color: colors.medium,
+    padding: '8px 10px',
+    fontWeight: 900,
+    fontSize: 11,
+    zIndex: 500,
+  },
+
+  emptyMap: {
+    border: `1px dashed ${colors.line}`,
+    padding: 34,
+    color: colors.muted,
+    textAlign: 'center',
+    minHeight: 230,
+    display: 'grid',
+    placeItems: 'center',
+  },
+
+  inputGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+    gap: 14,
+    marginTop: 14,
+  },
+
+  formGroup: {
+    display: 'grid',
+    gap: 7,
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: 900,
+  },
+
+  input: {
+    background: colors.panel2,
+    border: `1px solid ${colors.line}`,
+    color: colors.soft,
+    padding: '12px 13px',
+    outline: 'none',
   },
 
   actions: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
+    display: 'flex',
     gap: 12,
-    marginTop: 18,
+    marginTop: 16,
+    flexWrap: 'wrap',
   },
 
-  secondaryAction: {
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 16,
-    background: '#13261b',
-    color: '#ffffff',
-    padding: '14px 18px',
-    fontWeight: 800,
+  outlineAction: {
+    border: `1px solid ${colors.line}`,
+    background: 'transparent',
+    color: colors.soft,
+    padding: '12px 14px',
     cursor: 'pointer',
-    fontSize: 15,
+    fontWeight: 900,
   },
 
   primaryAction: {
     border: 'none',
-    borderRadius: 16,
-    background: '#1f5c3f',
-    color: '#ffffff',
-    padding: '14px 18px',
-    fontWeight: 800,
+    background: colors.medium,
+    color: '#04140c',
+    padding: '12px 14px',
     cursor: 'pointer',
-    fontSize: 15,
-  },
-
-  heroResultTop: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 12,
-    flexWrap: 'wrap',
-    marginBottom: 18,
+    fontWeight: 900,
   },
 
   savedChip: {
-    borderRadius: 999,
-    background: 'rgba(31,92,63,0.18)',
-    color: '#ffffff',
-    border: '1px solid rgba(31,92,63,0.35)',
-    fontSize: 12,
-    fontWeight: 800,
-    padding: '7px 12px',
+    color: colors.pastel,
+    border: `1px solid ${colors.line}`,
+    padding: '6px 9px',
+    fontSize: 11,
+    fontWeight: 900,
   },
 
-  resultTitle: {
-    margin: 0,
-    fontSize: 26,
-    fontWeight: 800,
-    color: '#f3f7f3',
-  },
-
-  emptyState: {
-    borderRadius: 20,
-    background: '#13261b',
-    border: '1px dashed rgba(255,255,255,0.12)',
-    padding: 18,
-    color: 'rgba(255,255,255,0.58)',
-    lineHeight: 1.85,
-  },
-
-  resultCards: {
+  resultGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-    gap: 14,
-    marginBottom: 18,
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    gap: 10,
+    marginBottom: 14,
   },
 
   resultCard: {
-    background: '#13261b',
-    border: '1px solid rgba(255,255,255,0.05)',
-    borderRadius: 22,
-    padding: 18,
-    minHeight: 110,
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'space-between',
+    background: colors.panel2,
+    border: `1px solid ${colors.line}`,
+    padding: 12,
   },
 
-  resultCardLabel: {
-    color: 'rgba(255,255,255,0.58)',
-    fontSize: 14,
-    fontWeight: 600,
-  },
-
-  resultCardValue: {
-    fontSize: 42,
-    lineHeight: 1,
+  resultLabel: {
+    color: colors.muted,
+    fontSize: 11,
     fontWeight: 900,
-    letterSpacing: '-1px',
-    color: '#ffffff',
+    textTransform: 'uppercase',
   },
 
-  resultSplit: {
-    display: 'grid',
-    gridTemplateColumns: '1.15fr 0.85fr',
-    gap: 18,
+  resultValue: {
+    color: '#fff',
+    fontSize: 28,
+    fontWeight: 900,
+    marginTop: 8,
   },
 
-  tableWrap: {
-    background: '#13261b',
-    border: '1px solid rgba(255,255,255,0.05)',
-    borderRadius: 22,
-    padding: 16,
+  tableBox: {
     overflowX: 'auto',
-  },
-
-  blockTitle: {
-    fontSize: 20,
-    fontWeight: 800,
-    marginBottom: 14,
-    color: '#f2f6f2',
+    border: `1px solid ${colors.line}`,
   },
 
   table: {
@@ -1012,246 +1113,193 @@ const s = {
   },
 
   totalRow: {
-    background: 'rgba(31,92,63,0.18)',
-    fontWeight: 800,
+    background: 'rgba(70,171,104,0.10)',
   },
 
-  recommendPanel: {
-    background: '#13261b',
-    border: '1px solid rgba(255,255,255,0.05)',
-    borderRadius: 22,
-    padding: 16,
-  },
-
-  recommendList: {
-    display: 'grid',
-    gap: 12,
+  recommendBox: {
+    marginTop: 14,
+    background: colors.panel2,
+    border: `1px solid ${colors.line}`,
+    padding: 14,
   },
 
   recommendItem: {
     display: 'grid',
-    gridTemplateColumns: '34px 1fr',
-    gap: 12,
-    alignItems: 'start',
-    color: '#ffffff',
-    lineHeight: 1.8,
-  },
-
-  recommendIndex: {
-    width: 34,
-    height: 34,
-    borderRadius: 12,
-    background: '#1f5c3f',
-    border: '1px solid rgba(255,255,255,0.08)',
-    display: 'grid',
-    placeItems: 'center',
-    fontWeight: 800,
-    color: '#ffffff',
+    gridTemplateColumns: '24px 1fr',
+    gap: 10,
+    color: colors.soft,
     fontSize: 13,
-  },
-
-  emptySmall: {
-    color: 'rgba(255,255,255,0.58)',
-  },
-
-  historySection: {
-    background: '#102017',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 28,
-    padding: 22,
-  },
-
-  historyHeader: {
-    marginBottom: 16,
+    lineHeight: 1.5,
   },
 
   historyList: {
     display: 'grid',
-    gap: 14,
-  },
-
-  historyCard: {
-    background: '#13261b',
-    border: '1px solid rgba(255,255,255,0.05)',
-    borderRadius: 22,
-    padding: 18,
-  },
-
-  historyCardActive: {
-    border: '1px solid rgba(215, 251, 233, 0.45)',
-  },
-
-  historyCardTop: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 12,
-    flexWrap: 'wrap',
-    marginBottom: 14,
-  },
-
-  historyName: {
-    fontSize: 18,
-    fontWeight: 800,
-    color: '#f5f8f5',
-  },
-
-  historyMeta: {
-    marginTop: 6,
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.56)',
-  },
-
-  historyDate: {
-    marginTop: 8,
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.72)',
-    fontWeight: 600,
-  },
-
-  detailBtn: {
-    border: 'none',
-    borderRadius: 14,
-    background: '#1f5c3f',
-    color: '#ffffff',
-    padding: '11px 16px',
-    fontWeight: 700,
-    cursor: 'pointer',
-  },
-
-  historyMetrics: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: 12,
-  },
-
-  historyGroup: {
-    background: '#163025',
-    border: '1px solid rgba(255,255,255,0.04)',
-    borderRadius: 18,
-    padding: 14,
-  },
-
-  historyGroupTitle: {
-    fontSize: 14,
-    fontWeight: 800,
-    color: '#ffffff',
-    marginBottom: 10,
-  },
-
-  historyGroupGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(5, minmax(0,1fr))',
     gap: 10,
   },
 
-  historyMetric: {
-    background: '#1c382b',
-    border: '1px solid rgba(255,255,255,0.04)',
-    borderRadius: 14,
+  historyCard: {
+    background: colors.panel2,
+    border: `1px solid ${colors.line}`,
     padding: 12,
   },
 
-  historyMetricLabel: {
+  historyActive: {
+    border: `1px solid ${colors.medium}`,
+  },
+
+  historyTop: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+
+  historyName: {
+    color: colors.soft,
+    fontWeight: 900,
+  },
+
+  historyMeta: {
+    color: colors.muted,
     fontSize: 12,
-    color: 'rgba(255,255,255,0.56)',
-    marginBottom: 6,
-    fontWeight: 600,
+    marginTop: 4,
   },
 
-  historyMetricValue: {
-    fontSize: 18,
-    fontWeight: 800,
-    color: '#f6f9f6',
+  historyValue: {
+    marginTop: 10,
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 1.6,
   },
 
-  historyFooter: {
-    marginTop: 14,
-    borderRadius: 16,
-    background: 'rgba(31,92,63,0.18)',
-    border: '1px solid rgba(31,92,63,0.35)',
+  detailBtn: {
+    border: `1px solid ${colors.line}`,
+    background: 'transparent',
+    color: colors.medium,
+    fontWeight: 900,
+    cursor: 'pointer',
+    padding: '6px 8px',
+  },
+
+  emptyState: {
+    border: `1px dashed ${colors.line}`,
+    minHeight: 180,
+    display: 'grid',
+    placeItems: 'center',
+    textAlign: 'center',
+    padding: 18,
+  },
+
+  emptyCompact: {
+    border: `1px dashed ${colors.line}`,
+    minHeight: 120,
+    display: 'grid',
+    placeItems: 'center',
+    textAlign: 'center',
     padding: 14,
-    fontWeight: 800,
-    color: '#ffffff',
+  },
+
+  emptyIcon: {
+    color: colors.medium,
+    fontSize: 26,
+  },
+
+  emptyTitle: {
+    color: colors.soft,
+    fontWeight: 900,
+  },
+
+  emptyText: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 1.6,
   },
 };
 
 const css = `
-  * { box-sizing: border-box; }
+  * {
+    box-sizing: border-box;
+  }
 
-  select, input {
+  body {
+    margin: 0;
+  }
+
+  button,
+  input,
+  select {
     font-family: inherit;
   }
 
-  select, option {
-    background: #18df6b;
-    color: #ffffff;
-  }
-
-  input::placeholder {
-    color: rgba(255,255,255,0.34);
-  }
-
-  table th, table td {
-    padding: 15px 12px;
-    text-align: left;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-  }
-
-  table th {
-    color: rgba(255,255,255,0.62);
-    font-size: 14px;
-    font-weight: 700;
-  }
-
-  table td {
-    color: #ffffff;
-    font-size: 15px;
-  }
-
   button {
-    transition: transform 0.16s ease, opacity 0.16s ease, background 0.16s ease;
+    transition: transform .15s ease, opacity .15s ease, background .15s ease;
   }
 
   button:hover {
     transform: translateY(-1px);
-    opacity: 0.98;
+    opacity: .96;
+  }
+
+  input::placeholder {
+    color: rgba(227,254,211,.35);
+  }
+
+  select option {
+    background: #0b2417;
+    color: #E3FED3;
+  }
+
+  table th,
+  table td {
+    padding: 10px;
+    border-bottom: 1px solid rgba(148,212,157,.12);
+    color: #E3FED3;
+    text-align: left;
+    font-size: 12px;
+  }
+
+  table th {
+    color: rgba(227,254,211,.55);
+    font-weight: 900;
+    text-transform: uppercase;
+  }
+
+  .leaflet-container {
+    background: #0b2417;
   }
 
   @media (max-width: 1180px) {
-    div[style*="grid-template-columns: 390px 1fr"] {
+    div[style*="grid-template-columns: 250px 1fr"] {
       grid-template-columns: 1fr !important;
     }
 
-    aside[style*="position: sticky"] {
-      position: static !important;
+    aside {
+      display: none !important;
+    }
+
+    div[style*="grid-template-columns: 1fr 380px"] {
+      grid-template-columns: 1fr !important;
+    }
+
+    div[style*="grid-template-columns: repeat(4, minmax(0, 1fr))"] {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     }
   }
 
-  @media (max-width: 980px) {
-    div[style*="grid-template-columns: repeat(3, minmax(0, 1fr))"] {
-      grid-template-columns: 1fr !important;
+  @media (max-width: 760px) {
+    div[style*="justify-content: space-between"] {
+      flex-direction: column;
     }
 
-    div[style*="grid-template-columns: 1.15fr 0.85fr"] {
-      grid-template-columns: 1fr !important;
-    }
-
-    div[style*="grid-template-columns: 1fr 1fr"] {
-      grid-template-columns: 1fr !important;
-    }
-
-    div[style*="grid-template-columns: repeat(5, minmax(0,1fr))"] {
-      grid-template-columns: 1fr 1fr !important;
-    }
-
-    h1 {
-      font-size: 40px !important;
+    input[style],
+    select[style] {
+      width: 100% !important;
     }
   }
 
-  @media (max-width: 560px) {
-    div[style*="grid-template-columns: repeat(5, minmax(0,1fr))"] {
+  @media (max-width: 650px) {
+    div[style*="grid-template-columns: repeat(4, minmax(0, 1fr))"],
+    div[style*="grid-template-columns: repeat(2, minmax(0, 1fr))"],
+    div[style*="grid-template-columns: repeat(3, 1fr)"] {
       grid-template-columns: 1fr !important;
     }
   }

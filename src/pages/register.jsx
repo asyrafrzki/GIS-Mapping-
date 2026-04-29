@@ -40,15 +40,17 @@ export default function RegisterPage({ onLogin, onNavigate }) {
     <div style={s.page}>
       <style>{css}</style>
 
-      <div style={s.card} className="glass">
+      <div style={s.card} className="auth-card">
         <div style={s.logoWrap}>
           <img src="/ppks.png" alt="PPKS" style={s.logo} />
         </div>
 
         <div style={s.kicker}>REGISTER</div>
-        <h1 style={s.title}>Daftar Akun SoilMap</h1>
+
+        <h1 style={s.title}>Daftar Akun</h1>
+
         <p style={s.desc}>
-          Buat akun untuk memantau lahan, menyimpan digitasi, dan mengirim laporan.
+          Buat akun untuk menyimpan digitasi dan memantau lahan.
         </p>
 
         <form onSubmit={submit}>
@@ -106,147 +108,195 @@ export default function RegisterPage({ onLogin, onNavigate }) {
   );
 }
 
-const primary = '#12b24b';
+const colors = {
+  soft: '#5de70e',
+  pastel: '#94D49D',
+  medium: '#46AB68',
+  dark: '#028739',
+  text: '#12351f',
+  muted: '#6b7b70',
+  page: '#E3FED3',
+  card: '#fcfcfc',
+  input: '#FFFEF8',
+};
 
 const s = {
   page: {
-    minHeight: '100vh',
-    background:
-      'radial-gradient(circle at top right, rgba(18,178,75,0.14), transparent 24%), linear-gradient(135deg, #020817 0%, #06111f 45%, #071827 100%)',
+    minHeight: '100svh',
+    height: '100svh',
+    background: colors.page,
     display: 'grid',
     placeItems: 'center',
-    padding: 24,
+    padding: 16,
     fontFamily: 'Inter, system-ui, sans-serif',
+    overflow: 'hidden',
   },
+
   card: {
     width: '100%',
-    maxWidth: 500,
-    padding: 32,
-    borderRadius: 28,
-    color: '#fff',
+    maxWidth: 390,
+    padding: '18px 24px',
+    borderRadius: 24,
+    background: colors.card,
+    color: colors.text,
+    border: '1px solid rgba(148, 212, 157, 0.35)',
+    boxShadow: '0 20px 55px rgba(18, 53, 31, 0.10)',
   },
+
   logoWrap: {
     display: 'flex',
     justifyContent: 'center',
-    marginBottom: 18,
+    marginBottom: 8,
   },
+
   logo: {
-    width: 88,
-    height: 88,
+    width: 54,
+    height: 54,
     objectFit: 'contain',
     borderRadius: 999,
     background: '#fff',
-    padding: 6,
-    boxShadow: '0 12px 28px rgba(0,0,0,0.22)',
+    padding: 5,
+    border: `3px solid ${colors.dark}`,
+    boxShadow: '0 10px 22px rgba(2, 135, 57, 0.14)',
   },
+
   kicker: {
-    fontSize: 12,
-    letterSpacing: 2,
-    color: '#82f2a8',
-    fontWeight: 800,
+    fontSize: 10.5,
+    letterSpacing: 2.4,
+    color: colors.dark,
+    fontWeight: 900,
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 6,
   },
+
   title: {
     margin: 0,
     textAlign: 'center',
-    fontSize: 34,
-    letterSpacing: '-1px',
+    fontSize: 26,
+    lineHeight: 1.15,
+    letterSpacing: '-0.8px',
+    color: colors.text,
   },
+
   desc: {
-    marginTop: 12,
+    marginTop: 8,
     textAlign: 'center',
-    color: 'rgba(255,255,255,0.64)',
-    lineHeight: 1.8,
-    fontSize: 15,
-    marginBottom: 22,
+    color: colors.muted,
+    lineHeight: 1.45,
+    fontSize: 13,
+    marginBottom: 12,
   },
+
   label: {
     display: 'block',
-    marginTop: 14,
-    marginBottom: 8,
-    color: 'rgba(255,255,255,0.82)',
-    fontWeight: 600,
-    fontSize: 14,
+    marginTop: 8,
+    marginBottom: 5,
+    color: colors.text,
+    fontWeight: 800,
+    fontSize: 13,
   },
+
   input: {
     width: '100%',
-    padding: '15px 16px',
-    borderRadius: 16,
-    border: '1px solid rgba(255,255,255,0.08)',
-    background: 'rgba(255,255,255,0.045)',
-    color: '#fff',
-    outline: 'none',
-    fontSize: 15,
-  },
-  error: {
-    marginTop: 14,
-    padding: '12px 14px',
+    padding: '10px 13px',
     borderRadius: 14,
-    background: 'rgba(239,68,68,0.14)',
-    border: '1px solid rgba(239,68,68,0.22)',
-    color: '#fca5a5',
+    border: '1px solid rgba(148, 212, 157, 0.55)',
+    background: colors.input,
+    color: colors.text,
+    outline: 'none',
     fontSize: 14,
   },
+
+  error: {
+    marginTop: 10,
+    padding: '9px 11px',
+    borderRadius: 12,
+    background: '#fee2e2',
+    border: '1px solid #fecaca',
+    color: '#991b1b',
+    fontSize: 13,
+  },
+
   primaryBtn: {
     width: '100%',
-    marginTop: 22,
-    padding: '15px 16px',
-    borderRadius: 16,
+    marginTop: 13,
+    padding: '11px 14px',
+    borderRadius: 14,
     border: 'none',
-    background: `linear-gradient(135deg, ${primary} 0%, #16a34a 100%)`,
+    background: colors.dark,
     color: '#fff',
     cursor: 'pointer',
-    fontWeight: 800,
-    fontSize: 16,
-    boxShadow: '0 14px 28px rgba(18,178,75,0.2)',
+    fontWeight: 900,
+    fontSize: 15,
+    boxShadow: '0 12px 24px rgba(2, 135, 57, 0.20)',
   },
+
   bottomRow: {
     display: 'flex',
     justifyContent: 'center',
-    gap: 8,
+    gap: 7,
     alignItems: 'center',
-    marginTop: 18,
+    marginTop: 11,
     flexWrap: 'wrap',
   },
+
   bottomText: {
-    color: 'rgba(255,255,255,0.6)',
+    color: colors.muted,
+    fontSize: 14,
   },
+
   linkBtn: {
     background: 'transparent',
     border: 'none',
-    color: '#5ab8ff',
+    color: colors.dark,
     cursor: 'pointer',
     padding: 0,
-    fontWeight: 700,
-    fontSize: 15,
+    fontWeight: 900,
+    fontSize: 14,
   },
 };
 
 const css = `
-  * { box-sizing: border-box; }
+  html,
+  body,
+  #root {
+    margin: 0;
+    width: 100%;
+    min-height: 100%;
+  }
 
-  .glass {
-    background: rgba(10,18,32,0.84);
-    border: 1px solid rgba(255,255,255,0.08);
-    backdrop-filter: blur(14px);
-    box-shadow: 0 18px 60px rgba(0,0,0,0.28);
+  body {
+    overflow: hidden;
+  }
+
+  * {
+    box-sizing: border-box;
   }
 
   input::placeholder {
-    color: rgba(255,255,255,0.28);
+    color: rgba(18, 53, 31, 0.34);
+  }
+
+  input:focus {
+    border-color: #46AB68 !important;
+    box-shadow: 0 0 0 3px rgba(70, 171, 104, 0.14);
+    background: #ffffff !important;
   }
 
   button {
-    transition: transform .18s ease, opacity .18s ease;
+    transition: transform .18s ease, opacity .18s ease, box-shadow .18s ease;
   }
 
   button:hover {
     transform: translateY(-1px);
-    opacity: .97;
+    opacity: .96;
   }
 
-  @media (max-width: 640px) {
+  @media (max-width: 520px) {
+    .auth-card {
+      max-width: 100% !important;
+    }
+
     button:hover {
       transform: none;
     }

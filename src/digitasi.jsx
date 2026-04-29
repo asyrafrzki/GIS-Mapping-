@@ -17,6 +17,23 @@ const DEFAULT_CENTER = [-6.9175, 107.6191];
 const DEFAULT_ZOOM = 9;
 const MAX_RADIUS = 100;
 
+const colors = {
+  cream: '#F6F1E7',
+  cream2: '#FFFDF4',
+  white: '#FFFFFF',
+  greenDark: '#076138',
+  greenDeep: '#03351F',
+  green: '#028739',
+  greenSoft: '#46AB68',
+  greenPale: '#E3FED3',
+  border: 'rgba(6, 78, 46, 0.14)',
+  borderStrong: 'rgba(6, 78, 46, 0.24)',
+  text: '#12351f',
+  muted: '#6b7b70',
+  danger: '#b91c1c',
+  dangerDark: '#991b1b',
+};
+
 const JENIS_OPTIONS = [
   { value: 'sampel', label: 'Titik Sampel Tanah' },
   { value: 'observasi', label: 'Titik Observasi' },
@@ -70,9 +87,9 @@ function makeIcon(color, label = '') {
 }
 
 function getJenisColor(jenis) {
-  if (jenis === 'sampel') return '#22c55e';
-  if (jenis === 'observasi') return '#60a5fa';
-  if (jenis === 'masalah') return '#ef4444';
+  if (jenis === 'sampel') return '#028739';
+  if (jenis === 'observasi') return '#46AB68';
+  if (jenis === 'masalah') return '#b91c1c';
   return '#f59e0b';
 }
 
@@ -217,7 +234,6 @@ export default function Digitasi({ token, onNavigate }) {
     return [centerPoint, ...polygonPoints];
   }, [centerPoint, polygonPoints]);
 
-  // Titik 1 ikut polygon, tetapi tetap jadi patokan radius.
   const sortedDraftPolygon = useMemo(() => {
     if (!centerPoint) return [];
     return sortPointsAroundCenter([centerPoint, ...polygonPoints], centerPoint);
@@ -231,7 +247,6 @@ export default function Digitasi({ token, onNavigate }) {
     }, 0);
   }, [centerPoint, polygonPoints]);
 
-  // Minimal total 3 titik: Titik 1 + Titik 2 + Titik 3
   const polygonReady = centerPoint && polygonPoints.length >= 2;
 
   const loadPoints = async () => {
@@ -376,13 +391,8 @@ export default function Digitasi({ token, onNavigate }) {
       deskripsi: isMasalah ? form.deskripsi : '',
       statusTindakLanjut: isMasalah ? form.statusTindakLanjut : '',
       radius: MAX_RADIUS,
-
-      // Titik 1 disimpan di lat/lng utama.
       lat: centerPoint.lat,
       lng: centerPoint.lng,
-
-      // Titik 2 dst disimpan di polygon_points.
-      // Saat render nanti digabung lagi dengan Titik 1.
       areaType: 'polygon',
       polygonPoints: sortedPolygonForSave,
       polygon_points: sortedPolygonForSave,
@@ -472,11 +482,11 @@ export default function Digitasi({ token, onNavigate }) {
 
       <div style={s.header}>
         <div>
-          <div style={s.kicker}>DIGITASI USER</div>
+          <div style={s.kicker}>DIGITASI LAHAN</div>
           <h1 style={s.title}>Digitasi Area Lahan</h1>
           <p style={s.subtitle}>
-            Titik 1 menjadi patokan radius 100 meter dan ikut membentuk polygon. Setelah
-            disimpan, peta hanya menampilkan polygon dan satu marker di tengah area.
+            Titik pertama menjadi acuan radius 100 meter. Tambahkan titik berikutnya
+            untuk membentuk polygon area lahan.
           </p>
         </div>
 
@@ -487,8 +497,6 @@ export default function Digitasi({ token, onNavigate }) {
 
       <div style={s.statsGrid}>
         <StatCard value={points.length} label="Total Area" />
-        <StatCard value={`${MAX_RADIUS} m`} label="Radius dari Titik 1" />
-        <StatCard value={allDraftPoints.length} label="Total Titik Aktif" />
       </div>
 
       <div style={s.layout}>
@@ -852,76 +860,85 @@ export default function Digitasi({ token, onNavigate }) {
             </MapContainer>
           </div>
 
-          <div style={s.card}>
-            <h2 style={s.sectionTitle}>Daftar Area Saya</h2>
+          <div style={{ ...s.card, ...s.areaListCard }}>
+            <div style={s.areaListHeader}>
+              <h2 style={s.sectionTitle}>Daftar Area Saya</h2>
+              <span style={s.areaCount}>{points.length} area</span>
+            </div>
 
-            {points.length === 0 ? (
-              <div style={s.empty}>Belum ada area.</div>
-            ) : (
-              points.map((point) => {
-                const polygon = normalizePolygon(point.polygon_points || point.polygonPoints);
-                const isPolygon = polygon.length >= 2;
+            <div style={s.areaScroll}>
+              {points.length === 0 ? (
+                <div style={s.empty}>Belum ada area.</div>
+              ) : (
+                points.map((point) => {
+                  const polygon = normalizePolygon(point.polygon_points || point.polygonPoints);
+                  const isPolygon = polygon.length >= 2;
 
-                return (
-                  <div key={point.id} style={s.areaItem}>
-                    <div style={s.areaTop}>
-                      <div>
-                        <div style={s.areaTitle}>{point.nama}</div>
-                        <div style={s.areaMeta}>
-                          {getJenisLabel(point.jenis)} · {point.lokasi || '-'} ·{' '}
-                          {point.daerah || '-'}
+                  return (
+                    <div key={point.id} style={s.areaItem}>
+                      <div style={s.areaTop}>
+                        <div>
+                          <div style={s.areaTitle}>{point.nama}</div>
+                          <div style={s.areaMeta}>
+                            {getJenisLabel(point.jenis)} · {point.lokasi || '-'} ·{' '}
+                            {point.daerah || '-'}
+                          </div>
                         </div>
+
+                        <span style={s.badge}>
+                          {isPolygon ? `${polygon.length + 1} titik area` : 'data lama'}
+                        </span>
                       </div>
 
-                      <span style={s.badge}>
-                        {isPolygon ? `${polygon.length + 1} titik area` : 'data lama'}
-                      </span>
-                    </div>
-
-                    {!point.jenis?.includes('masalah') && point.tanah_user && (
-                      <div style={s.infoText}>
-                        <strong>Nama Tanah:</strong> {point.tanah_user}
-                      </div>
-                    )}
-
-                    {point.jenis === 'masalah' && (
-                      <>
+                      {!point.jenis?.includes('masalah') && point.tanah_user && (
                         <div style={s.infoText}>
-                          <strong>Status:</strong>{' '}
-                          {point.status_tindak_lanjut || 'belum ditindaklanjuti'}
+                          <strong>Nama Tanah:</strong> {point.tanah_user}
                         </div>
-                        {point.deskripsi && <div style={s.descBox}>{point.deskripsi}</div>}
-                      </>
-                    )}
-
-                    <div style={s.infoText}>
-                      <strong>Titik 1:</strong>{' '}
-                      {Number(point.lat).toFixed(6)}, {Number(point.lng).toFixed(6)}
-                    </div>
-
-                    <div style={s.infoText}>
-                      <strong>Radius input:</strong> {point.radius || MAX_RADIUS} m
-                    </div>
-
-                    <div style={s.areaActions}>
-                      <button type="button" style={s.darkBtn} onClick={() => editPoint(point)}>
-                        Edit
-                      </button>
-
-                      {point.jenis === 'masalah' && (
-                        <button type="button" style={s.greenBtn} onClick={() => sendReport(point.id)}>
-                          Kirim Laporan
-                        </button>
                       )}
 
-                      <button type="button" style={s.redBtn} onClick={() => deletePoint(point.id)}>
-                        Hapus
-                      </button>
+                      {point.jenis === 'masalah' && (
+                        <>
+                          <div style={s.infoText}>
+                            <strong>Status:</strong>{' '}
+                            {point.status_tindak_lanjut || 'belum ditindaklanjuti'}
+                          </div>
+                          {point.deskripsi && <div style={s.descBox}>{point.deskripsi}</div>}
+                        </>
+                      )}
+
+                      <div style={s.infoText}>
+                        <strong>Titik 1:</strong>{' '}
+                        {Number(point.lat).toFixed(6)}, {Number(point.lng).toFixed(6)}
+                      </div>
+
+                      <div style={s.infoText}>
+                        <strong>Radius input:</strong> {point.radius || MAX_RADIUS} m
+                      </div>
+
+                      <div style={s.areaActions}>
+                        <button type="button" style={s.darkBtn} onClick={() => editPoint(point)}>
+                          Edit
+                        </button>
+
+                        {point.jenis === 'masalah' && (
+                          <button
+                            type="button"
+                            style={s.greenBtn}
+                            onClick={() => sendReport(point.id)}
+                          >
+                            Kirim Laporan
+                          </button>
+                        )}
+
+                        <button type="button" style={s.redBtn} onClick={() => deletePoint(point.id)}>
+                          Hapus
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })
-            )}
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -941,290 +958,392 @@ function StatCard({ value, label }) {
 const s = {
   page: {
     minHeight: '100vh',
-    background: '#07110b',
-    color: '#fff',
-    padding: 24,
+    background: colors.cream,
+    color: colors.text,
+    padding: 28,
     fontFamily: 'Inter, system-ui, sans-serif',
   },
+
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     gap: 18,
     flexWrap: 'wrap',
-    marginBottom: 20,
+    marginBottom: 24,
   },
+
   kicker: {
     fontSize: 12,
     letterSpacing: 2,
-    color: 'rgba(255,255,255,0.6)',
+    color: colors.green,
     marginBottom: 8,
+    fontWeight: 900,
   },
+
   title: {
     margin: 0,
     fontSize: 42,
     fontWeight: 900,
     letterSpacing: '-1px',
+    color: colors.greenDeep,
+    lineHeight: 1.1,
   },
+
   subtitle: {
-    color: 'rgba(255,255,255,0.72)',
+    color: colors.muted,
     maxWidth: 850,
     lineHeight: 1.8,
+    fontSize: 14,
   },
+
   backBtn: {
     padding: '12px 16px',
     borderRadius: 14,
-    border: '1px solid rgba(255,255,255,0.08)',
-    background: '#13261b',
-    color: '#fff',
-    fontWeight: 700,
+    border: `1px solid ${colors.borderStrong}`,
+    background: colors.white,
+    color: colors.greenDark,
+    fontWeight: 900,
     cursor: 'pointer',
+    boxShadow: '0 10px 24px rgba(6,78,46,0.08)',
   },
+
   statsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
+    gridTemplateColumns: 'minmax(220px, 360px)',
     gap: 14,
     marginBottom: 18,
   },
+
   statCard: {
-    background: '#102017',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 20,
-    padding: 18,
+    background: colors.white,
+    border: `1px solid ${colors.border}`,
+    borderRadius: 22,
+    padding: 20,
+    boxShadow: '0 14px 36px rgba(6,78,46,0.08)',
   },
+
   statValue: {
-    fontSize: 36,
+    fontSize: 38,
     fontWeight: 900,
-    color: '#4ade80',
+    color: colors.green,
+    lineHeight: 1,
   },
+
   statLabel: {
-    color: 'rgba(255,255,255,0.62)',
-    marginTop: 6,
+    color: colors.muted,
+    marginTop: 8,
+    fontWeight: 700,
   },
+
   layout: {
     display: 'grid',
     gridTemplateColumns: '420px 1fr',
-    gap: 16,
+    gap: 18,
+    alignItems: 'start',
   },
+
   left: {
     display: 'flex',
     flexDirection: 'column',
     gap: 16,
   },
+
   right: {
     display: 'flex',
     flexDirection: 'column',
     gap: 16,
   },
+
   card: {
-    background: '#102017',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 22,
+    background: colors.white,
+    border: `1px solid ${colors.border}`,
+    borderRadius: 24,
     padding: 20,
+    boxShadow: '0 14px 36px rgba(6,78,46,0.08)',
   },
+
   actionTop: {
     display: 'flex',
     gap: 10,
     flexWrap: 'wrap',
     marginBottom: 14,
   },
+
   greenBtn: {
     padding: '11px 14px',
     borderRadius: 13,
     border: 'none',
-    background: '#1f5c3f',
-    color: '#fff',
+    background: colors.greenDark,
+    color: colors.white,
     cursor: 'pointer',
-    fontWeight: 800,
+    fontWeight: 900,
+    boxShadow: '0 12px 24px rgba(6,78,46,0.18)',
   },
+
   darkBtn: {
     padding: '11px 14px',
     borderRadius: 13,
-    border: '1px solid rgba(255,255,255,0.08)',
-    background: '#13261b',
-    color: '#fff',
+    border: `1px solid ${colors.border}`,
+    background: colors.cream2,
+    color: colors.greenDark,
     cursor: 'pointer',
-    fontWeight: 700,
+    fontWeight: 900,
   },
+
   fullDarkBtn: {
     width: '100%',
     padding: '12px 14px',
     borderRadius: 13,
-    border: '1px solid rgba(255,255,255,0.08)',
-    background: '#13261b',
-    color: '#fff',
+    border: 'none',
+    background: colors.greenDark,
+    color: colors.white,
     cursor: 'pointer',
-    fontWeight: 800,
+    fontWeight: 900,
+    boxShadow: '0 12px 24px rgba(6,78,46,0.18)',
   },
+
   redBtn: {
     padding: '11px 14px',
     borderRadius: 13,
     border: 'none',
-    background: '#991b1b',
-    color: '#fff',
+    background: colors.dangerDark,
+    color: colors.white,
     cursor: 'pointer',
-    fontWeight: 800,
+    fontWeight: 900,
   },
+
   redSmallBtn: {
     padding: '8px 10px',
     borderRadius: 10,
     border: 'none',
-    background: '#991b1b',
-    color: '#fff',
+    background: colors.dangerDark,
+    color: colors.white,
     cursor: 'pointer',
-    fontWeight: 700,
+    fontWeight: 800,
   },
+
   notice: {
-    background: '#13261b',
-    border: '1px solid rgba(255,255,255,0.06)',
+    background: colors.cream2,
+    border: `1px solid ${colors.border}`,
     borderRadius: 16,
     padding: 14,
-    color: 'rgba(255,255,255,0.72)',
+    color: colors.text,
     lineHeight: 1.7,
     marginBottom: 16,
   },
+
   sectionTitle: {
     margin: '0 0 14px',
     fontSize: 24,
     fontWeight: 900,
+    color: colors.greenDeep,
   },
+
   label: {
     display: 'block',
     marginTop: 14,
     marginBottom: 7,
-    fontWeight: 700,
-    color: 'rgba(255,255,255,0.82)',
+    fontWeight: 900,
+    color: colors.greenDeep,
+    fontSize: 13,
   },
+
   input: {
     width: '100%',
     padding: '13px 14px',
     borderRadius: 14,
-    border: '1px solid rgba(255,255,255,0.08)',
-    background: '#13261b',
-    color: '#fff',
+    border: `1px solid ${colors.border}`,
+    background: colors.cream2,
+    color: colors.text,
     outline: 'none',
+    fontSize: 14,
   },
+
   textarea: {
     width: '100%',
     minHeight: 110,
     padding: '13px 14px',
     borderRadius: 14,
-    border: '1px solid rgba(255,255,255,0.08)',
-    background: '#13261b',
-    color: '#fff',
+    border: `1px solid ${colors.border}`,
+    background: colors.cream2,
+    color: colors.text,
     outline: 'none',
     resize: 'vertical',
     fontFamily: 'inherit',
+    fontSize: 14,
   },
+
   manualBox: {
     marginTop: 14,
     padding: 14,
     borderRadius: 16,
-    background: '#0c1a12',
-    border: '1px solid rgba(255,255,255,0.06)',
+    background: colors.cream2,
+    border: `1px solid ${colors.border}`,
   },
+
   manualTitle: {
-    fontWeight: 800,
+    fontWeight: 900,
     marginBottom: 6,
+    color: colors.greenDeep,
   },
+
   manualHint: {
-    color: 'rgba(255,255,255,0.58)',
+    color: colors.muted,
     fontSize: 13,
     marginBottom: 10,
+    lineHeight: 1.6,
   },
+
   manualGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     gap: 10,
     marginBottom: 10,
   },
+
   polygonInfo: {
     marginTop: 14,
     padding: 14,
     borderRadius: 16,
-    background: '#0c1a12',
-    border: '1px solid rgba(255,255,255,0.06)',
-    color: 'rgba(255,255,255,0.72)',
+    background: colors.cream2,
+    border: `1px solid ${colors.border}`,
+    color: colors.text,
     lineHeight: 1.8,
   },
+
   pointList: {
     marginTop: 14,
     display: 'grid',
     gap: 10,
+    color: colors.greenDeep,
   },
+
   pointDraft: {
     display: 'flex',
     justifyContent: 'space-between',
     gap: 10,
     alignItems: 'center',
-    background: '#13261b',
-    border: '1px solid rgba(255,255,255,0.06)',
+    background: colors.white,
+    border: `1px solid ${colors.border}`,
     borderRadius: 14,
     padding: 12,
   },
+
   pointDraftTitle: {
-    fontWeight: 800,
+    fontWeight: 900,
+    color: colors.greenDeep,
   },
+
   smallText: {
-    color: 'rgba(255,255,255,0.58)',
+    color: colors.muted,
     marginTop: 4,
     fontSize: 13,
   },
+
   saveBtn: {
     width: '100%',
     marginTop: 16,
     padding: '14px 16px',
     borderRadius: 14,
     border: 'none',
-    background: '#1f5c3f',
-    color: '#fff',
+    background: colors.greenDark,
+    color: colors.white,
     cursor: 'pointer',
     fontWeight: 900,
+    boxShadow: '0 12px 24px rgba(6,78,46,0.18)',
   },
+
   empty: {
-    color: 'rgba(255,255,255,0.5)',
+    color: colors.muted,
     padding: 16,
+    background: colors.cream2,
+    borderRadius: 14,
+    border: `1px dashed ${colors.borderStrong}`,
   },
+
+  areaListCard: {
+    height: 640,
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+
+  areaListHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+    flexShrink: 0,
+  },
+
+  areaCount: {
+    padding: '7px 11px',
+    borderRadius: 999,
+    background: colors.greenPale,
+    color: colors.greenDark,
+    border: `1px solid ${colors.border}`,
+    fontWeight: 900,
+    fontSize: 12,
+  },
+
+  areaScroll: {
+    overflowY: 'auto',
+    paddingRight: 8,
+  },
+
   areaItem: {
     padding: '16px 0',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    borderBottom: `1px solid ${colors.border}`,
   },
+
   areaTop: {
     display: 'flex',
     justifyContent: 'space-between',
     gap: 12,
     flexWrap: 'wrap',
   },
+
   areaTitle: {
     fontSize: 18,
     fontWeight: 900,
+    color: colors.greenDeep,
   },
+
   areaMeta: {
     marginTop: 6,
-    color: 'rgba(255,255,255,0.56)',
+    color: colors.muted,
+    fontSize: 13,
   },
+
   badge: {
     height: 'fit-content',
     padding: '8px 12px',
     borderRadius: 999,
-    background: 'rgba(31,92,63,0.2)',
-    border: '1px solid rgba(31,92,63,0.4)',
-    color: '#fff',
-    fontWeight: 800,
+    background: colors.greenPale,
+    border: `1px solid ${colors.border}`,
+    color: colors.greenDark,
+    fontWeight: 900,
     fontSize: 13,
   },
+
   infoText: {
     marginTop: 9,
-    color: 'rgba(255,255,255,0.78)',
+    color: colors.text,
+    fontSize: 13,
   },
+
   descBox: {
     marginTop: 10,
     padding: 12,
     borderRadius: 14,
-    background: '#13261b',
-    color: 'rgba(255,255,255,0.72)',
+    background: colors.cream2,
+    color: colors.text,
     lineHeight: 1.7,
+    border: `1px solid ${colors.border}`,
   },
+
   areaActions: {
     display: 'flex',
     gap: 10,
@@ -1238,24 +1357,77 @@ const css = `
     box-sizing: border-box;
   }
 
+  body {
+    margin: 0;
+    background: ${colors.cream};
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font-family: inherit;
+  }
+
+  button {
+    transition: transform .15s ease, opacity .15s ease, box-shadow .15s ease;
+  }
+
+  button:hover {
+    transform: translateY(-1px);
+    opacity: .96;
+  }
+
   select,
   option {
-    background: #13261b;
-    color: #fff;
+    background: ${colors.cream2};
+    color: ${colors.text};
   }
 
   input::placeholder,
   textarea::placeholder {
-    color: rgba(255,255,255,.32);
+    color: rgba(18, 53, 31, 0.36);
+  }
+
+  input:focus,
+  textarea:focus,
+  select:focus {
+    border-color: rgba(6, 78, 46, 0.34) !important;
+    box-shadow: 0 0 0 3px rgba(70, 171, 104, 0.12);
+    background: #ffffff !important;
+  }
+
+  div::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  div::-webkit-scrollbar-track {
+    background: rgba(6, 78, 46, 0.06);
+    border-radius: 999px;
+  }
+
+  div::-webkit-scrollbar-thumb {
+    background: rgba(6, 78, 46, 0.28);
+    border-radius: 999px;
+  }
+
+  div::-webkit-scrollbar-thumb:hover {
+    background: rgba(6, 78, 46, 0.42);
   }
 
   .leaflet-container {
-    background: #13261b;
+    background: ${colors.cream2};
+  }
+
+  .leaflet-popup-content-wrapper,
+  .leaflet-popup-tip {
+    background: ${colors.white};
+    color: ${colors.text};
   }
 
   @media (max-width: 1100px) {
     div[style*="grid-template-columns: 420px 1fr"],
-    div[style*="grid-template-columns: repeat(3, 1fr)"] {
+    div[style*="grid-template-columns: minmax(220px, 360px)"] {
       grid-template-columns: 1fr !important;
     }
   }

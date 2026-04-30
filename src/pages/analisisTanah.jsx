@@ -12,21 +12,20 @@ L.Icon.Default.mergeOptions({
 });
 
 const colors = {
-  bg: '#06140d',
-  bg2: '#071b11',
-  sidebar: '#071c12',
-  panel: '#0b2417',
-  panel2: '#0f2d1d',
-  panel3: '#113522',
-  line: 'rgba(148, 212, 157, 0.14)',
-  lineStrong: 'rgba(148, 212, 157, 0.28)',
-  text: '#E3FED3',
-  muted: 'rgba(227,254,211,0.58)',
-  soft: '#E3FED3',
-  pastel: '#94D49D',
-  medium: '#46AB68',
-  dark: '#028739',
-  danger: '#ef4444',
+  cream: '#F6F1E7',
+  cream2: '#FFFDF4',
+  white: '#FFFFFF',
+  greenDark: '#076138',
+  greenDeep: '#03351F',
+  green: '#028739',
+  greenSoft: '#46AB68',
+  greenPale: '#E3FED3',
+  border: 'rgba(6, 78, 46, 0.14)',
+  borderStrong: 'rgba(6, 78, 46, 0.24)',
+  text: '#12351f',
+  muted: '#6b7b70',
+  danger: '#b91c1c',
+  dangerDark: '#991b1b',
 };
 
 const EMPTY_FORM = {
@@ -238,9 +237,9 @@ export default function AnalisisTanah({ token, onNavigate }) {
   }, [history, form.pointId]);
 
   const formatSourceLabel = (source) => {
-    if (source === 'geojson-gridcode') return 'GeoJSON Grid';
+    if (source === 'geojson-gridcode') return 'GeoJSON ';
     if (source === 'geojson') return 'GeoJSON';
-    if (source === 'default') return 'Default';
+    if (source === 'default') return 'Default Sistem';
     return source || '-';
   };
 
@@ -265,6 +264,163 @@ export default function AnalisisTanah({ token, onNavigate }) {
     });
   };
 
+  const safeFileName = (value) => {
+    return String(value || 'analisis-tanah')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-+|-+$/g, '');
+  };
+
+  const exportExcel = () => {
+    if (!result) {
+      alert('Belum ada hasil analisis untuk diexport.');
+      return;
+    }
+
+    const tanggalExport = new Date().toLocaleString('id-ID');
+    const namaFile = `hasil-analisis-${safeFileName(form.pointName)}.xls`;
+
+    const html = `
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+            }
+
+            h2 {
+              color: #03351F;
+            }
+
+            table {
+              border-collapse: collapse;
+              width: 100%;
+              margin-bottom: 18px;
+            }
+
+            th {
+              background: #076138;
+              color: #ffffff;
+              font-weight: bold;
+            }
+
+            th, td {
+              border: 1px solid #b7d8bf;
+              padding: 8px;
+              font-size: 12px;
+            }
+
+            .section {
+              background: #E3FED3;
+              color: #03351F;
+              font-weight: bold;
+            }
+          </style>
+        </head>
+        <body>
+          <h2>Hasil Analisis Tanah</h2>
+
+          <table>
+            <tr><td class="section" colspan="2">Informasi Titik/Lahan</td></tr>
+            <tr><td>Nama Titik</td><td>${form.pointName || '-'}</td></tr>
+            <tr><td>Lokasi</td><td>${form.lokasi || '-'}</td></tr>
+            <tr><td>Daerah</td><td>${form.daerah || '-'}</td></tr>
+            <tr><td>Radius</td><td>${form.radius || 0} m</td></tr>
+            <tr><td>Latitude</td><td>${form.lat || '-'}</td></tr>
+            <tr><td>Longitude</td><td>${form.lng || '-'}</td></tr>
+            <tr><td>Tanggal Export</td><td>${tanggalExport}</td></tr>
+          </table>
+
+          <table>
+            <tr><td class="section" colspan="3">Kandungan Daun (%)</td></tr>
+            <tr>
+              <th>Unsur</th>
+              <th>Nilai</th>
+              <th>Sumber Data</th>
+            </tr>
+            <tr><td>Nitrogen (N)</td><td>${form.n || '-'}</td><td>${formatSourceLabel(form.nSource)}</td></tr>
+            <tr><td>Fosfor (P)</td><td>${form.p || '-'}</td><td>${formatSourceLabel(form.pSource)}</td></tr>
+            <tr><td>Kalium (K)</td><td>${form.k || '-'}</td><td>${formatSourceLabel(form.kSource)}</td></tr>
+            <tr><td>Magnesium (Mg)</td><td>${form.mg || '-'}</td><td>${formatSourceLabel(form.mgSource)}</td></tr>
+          </table>
+
+          <table>
+            <tr><td class="section" colspan="4">Parameter Produksi</td></tr>
+            <tr><td>Umur</td><td>${form.umur || '-'}</td><td>Luas</td><td>${form.luas || '-'}</td></tr>
+            <tr><td>Protas</td><td>${form.protas || '-'}</td><td>Jumlah Pohon</td><td>${form.jumlahPohon || '-'}</td></tr>
+          </table>
+
+          <table>
+            <tr><td class="section" colspan="4">Rincian Rekomendasi Pupuk</td></tr>
+            <tr>
+              <th>Jenis Pupuk</th>
+              <th>Aplikasi I</th>
+              <th>Aplikasi II</th>
+              <th>Total</th>
+            </tr>
+            <tr>
+              <td>Urea</td>
+              <td>${result.aplikasi1.urea}</td>
+              <td>${result.aplikasi2.urea}</td>
+              <td>${totalPupuk(result.aplikasi1.urea, result.aplikasi2.urea)}</td>
+            </tr>
+            <tr>
+              <td>TSP</td>
+              <td>${result.aplikasi1.tsp}</td>
+              <td>${result.aplikasi2.tsp}</td>
+              <td>${totalPupuk(result.aplikasi1.tsp, result.aplikasi2.tsp)}</td>
+            </tr>
+            <tr>
+              <td>KCl</td>
+              <td>${result.aplikasi1.kcl}</td>
+              <td>${result.aplikasi2.kcl}</td>
+              <td>${totalPupuk(result.aplikasi1.kcl, result.aplikasi2.kcl)}</td>
+            </tr>
+            <tr>
+              <td>Dolomit</td>
+              <td>${result.aplikasi1.dolomit}</td>
+              <td>${result.aplikasi2.dolomit}</td>
+              <td>${totalPupuk(result.aplikasi1.dolomit, result.aplikasi2.dolomit)}</td>
+            </tr>
+            <tr>
+              <th>Total</th>
+              <th>${result.summary.aplikasi1_total}</th>
+              <th>${result.summary.aplikasi2_total}</th>
+              <th>${result.summary.total_rekomendasi}</th>
+            </tr>
+          </table>
+
+          <table>
+            <tr><td class="section">Rekomendasi Tindakan</td></tr>
+            ${
+              result.recommendations?.length
+                ? result.recommendations
+                    .map((item, index) => `<tr><td>${index + 1}. ${item}</td></tr>`)
+                    .join('')
+                : '<tr><td>Belum ada rekomendasi.</td></tr>'
+            }
+          </table>
+        </body>
+      </html>
+    `;
+
+    const blob = new Blob([html], {
+      type: 'application/vnd.ms-excel;charset=utf-8;',
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download = namaFile;
+    document.body.appendChild(link);
+    link.click();
+
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const mapLat = Number(form.lat);
   const mapLng = Number(form.lng);
   const mapRadius = Number(form.radius) || 0;
@@ -277,84 +433,69 @@ export default function AnalisisTanah({ token, onNavigate }) {
       <aside style={s.sidebar}>
         <div>
           <div style={s.logoBox}>
-            <img src="/ppks.png" alt="PPKS" style={s.logo} />
+            <img src="/ppks.png" alt="Monitoring Hara" style={s.logo} />
             <div>
-              <div style={s.logoText}>SoilMap</div>
-              <div style={s.logoSub}>Nutrient System</div>
+              <div style={s.logoText}>Monitoring</div>
+              <div style={s.logoText}>Hara</div>
             </div>
           </div>
 
           <nav style={s.nav}>
             <button style={s.navItem} onClick={() => onNavigate('user-dashboard')}>
-              <span>▦</span>
               Dashboard
             </button>
 
-            <button style={s.navItem} onClick={() => onNavigate('map')}>
-              <span>◫</span>
-              Map
-            </button>
-
             <button style={s.navItem} onClick={() => onNavigate('digitasi')}>
-              <span>◇</span>
-              Digitization
+              Digitasi
             </button>
 
             <button style={s.navItem} onClick={() => onNavigate('laporan')}>
-              <span>▣</span>
-              Reports
+              Laporan
             </button>
 
             <button style={{ ...s.navItem, ...s.navItemActive }}>
-              <span>⚗</span>
-              Soil Analysis
+              Analisis Tanah
             </button>
           </nav>
-        </div>
-
-        <div style={s.sidebarBottom}>
-          <button style={s.newBtn} onClick={() => onNavigate('digitasi')}>
-            New Field Report
-          </button>
-
-          <button style={s.sideSmallBtn} onClick={() => onNavigate('user-dashboard')}>
-            ← Back Dashboard
-          </button>
         </div>
       </aside>
 
       <main style={s.main}>
-        <div style={s.searchRow}>
-          <input style={s.searchInput} placeholder="Search parameters..." />
-
-          <select
-            style={s.topSelect}
-            value={form.pointId}
-            onChange={(e) => handleSelectPoint(e.target.value)}
-          >
-            <option value="">Pilih Titik/Lahan</option>
-            {points.map((point) => (
-              <option key={point.id} value={point.id}>
-                {point.nama} - {point.lokasi || '-'} - {point.daerah || '-'}
-              </option>
-            ))}
-          </select>
-        </div>
-
         <header style={s.header}>
           <div>
-            <div style={s.eyebrow}>SOIL ANALYSIS REPORT</div>
-            <h1 style={s.title}>Analisis Kandungan Tanah</h1>
-            <p style={s.subtitle}>
-              Real-time nutrient concentration monitoring, spatial tracking, and fertilizer
-              recommendation history.
-            </p>
+            <h1 style={s.title}> Analisis Kandungan Tanah</h1>
+          </div>
+        </header>
+
+        <div style={s.topBar}>
+          <div style={s.selectBox}>
+            <label style={s.topLabel}>Pilih Titik/Lahan</label>
+            <select
+              style={s.topSelect}
+              value={form.pointId}
+              onChange={(e) => handleSelectPoint(e.target.value)}
+            >
+              <option value="">Pilih Titik/Lahan</option>
+              {points.map((point) => (
+                <option key={point.id} value={point.id}>
+                  {point.nama} - {point.lokasi || '-'} - {point.daerah || '-'}
+                </option>
+              ))}
+            </select>
           </div>
 
-          <button style={s.backBtn} onClick={() => onNavigate('user-dashboard')}>
-            ← Dashboard User
+          <button
+            style={{
+              ...s.exportBtn,
+              opacity: result ? 1 : 0.55,
+              cursor: result ? 'pointer' : 'not-allowed',
+            }}
+            onClick={exportExcel}
+            disabled={!result}
+          >
+            Export ke Excel
           </button>
-        </header>
+        </div>
 
         <section style={s.layout}>
           <div style={s.left}>
@@ -362,11 +503,11 @@ export default function AnalisisTanah({ token, onNavigate }) {
               <div style={s.panelHeader}>
                 <div>
                   <div style={s.panelTag}>KANDUNGAN DAUN (%)</div>
-                  <h3 style={s.panelTitle}>Nutrient Concentration</h3>
+                  <h3 style={s.panelTitle}>Konsentrasi Unsur Hara</h3>
                 </div>
 
                 <div style={s.updateText}>
-                  Last update: {new Date().toLocaleDateString('id-ID')}
+                  Update: {new Date().toLocaleDateString('id-ID')}
                 </div>
               </div>
 
@@ -379,7 +520,7 @@ export default function AnalisisTanah({ token, onNavigate }) {
                 />
 
                 <NutrientBlock
-                  name="Phosphor (P)"
+                  name="Fosfor (P)"
                   value={form.p || '-'}
                   source={formatSourceLabel(form.pSource)}
                   sourceStyle={sourceTone(form.pSource)}
@@ -404,21 +545,17 @@ export default function AnalisisTanah({ token, onNavigate }) {
             <section style={s.panel}>
               <div style={s.panelHeader}>
                 <div>
-                  <div style={s.panelTag}>SPATIAL DISTRIBUTION MAP</div>
+                  <div style={s.panelTag}>PETA LOKASI</div>
                   <h3 style={s.panelTitle}>Lokasi Titik Lahan</h3>
                 </div>
 
-                {hasMap && (
-                  <div style={s.updateText}>
-                    Radius {mapRadius || 0} m
-                  </div>
-                )}
+                {hasMap && <div style={s.updateText}>Radius {mapRadius || 0} m</div>}
               </div>
 
               {!hasMap ? (
                 <div style={s.emptyMap}>
                   <div style={s.emptyIcon}>▧</div>
-                  <div style={s.emptyTitle}>No Active Location</div>
+                  <div style={s.emptyTitle}>Belum Ada Lokasi Aktif</div>
                   <div style={s.emptyText}>
                     Pilih titik/lahan terlebih dahulu untuk menampilkan lokasi pada peta.
                   </div>
@@ -429,7 +566,7 @@ export default function AnalisisTanah({ token, onNavigate }) {
                     center={[mapLat, mapLng]}
                     zoom={15}
                     scrollWheelZoom={false}
-                    style={{ height: 300, width: '100%' }}
+                    style={{ height: 310, width: '100%' }}
                   >
                     <TileLayer
                       attribution="&copy; OpenStreetMap"
@@ -449,8 +586,8 @@ export default function AnalisisTanah({ token, onNavigate }) {
                         center={[mapLat, mapLng]}
                         radius={mapRadius}
                         pathOptions={{
-                          color: colors.medium,
-                          fillColor: colors.medium,
+                          color: colors.green,
+                          fillColor: colors.green,
                           fillOpacity: 0.16,
                         }}
                       />
@@ -468,7 +605,7 @@ export default function AnalisisTanah({ token, onNavigate }) {
               <div style={s.panelHeader}>
                 <div>
                   <div style={s.panelTag}>INPUT PARAMETER</div>
-                  <h3 style={s.panelTitle}>Production Parameters</h3>
+                  <h3 style={s.panelTitle}>Parameter Produksi</h3>
                 </div>
               </div>
 
@@ -500,11 +637,11 @@ export default function AnalisisTanah({ token, onNavigate }) {
 
               <div style={s.actions}>
                 <button style={s.outlineAction} onClick={hitung}>
-                  Calculate
+                  Hitung
                 </button>
 
                 <button style={s.primaryAction} onClick={simpan}>
-                  Calculate & Save
+                  Hitung & Simpan
                 </button>
               </div>
             </section>
@@ -514,23 +651,23 @@ export default function AnalisisTanah({ token, onNavigate }) {
             <section style={s.panel}>
               <div style={s.panelHeader}>
                 <div>
-                  <div style={s.panelTag}>ANALYSIS SUMMARY</div>
-                  <h3 style={s.panelTitleSmall}>Result Overview</h3>
+                  <div style={s.panelTag}>RINGKASAN ANALISIS</div>
+                  <h3 style={s.panelTitleSmall}>Hasil Rekomendasi</h3>
                 </div>
 
-                {selectedHistoryId && <span style={s.savedChip}>Saved</span>}
+                {selectedHistoryId && <span style={s.savedChip}>Tersimpan</span>}
               </div>
 
               {!result ? (
                 <EmptyState
-                  title="No Active Analysis"
-                  text="Run a new field test or select a saved analysis to generate fertilizer summary."
+                  title="Belum Ada Analisis"
+                  text="Pilih titik lahan, isi parameter produksi, lalu klik tombol Hitung."
                 />
               ) : (
                 <>
                   <div style={s.resultGrid}>
-                    <ResultCard label="App I" value={result.summary.aplikasi1_total} />
-                    <ResultCard label="App II" value={result.summary.aplikasi2_total} />
+                    <ResultCard label="Aplikasi I" value={result.summary.aplikasi1_total} />
+                    <ResultCard label="Aplikasi II" value={result.summary.aplikasi2_total} />
                     <ResultCard label="Total" value={result.summary.total_rekomendasi} />
                   </div>
 
@@ -539,8 +676,8 @@ export default function AnalisisTanah({ token, onNavigate }) {
                       <thead>
                         <tr>
                           <th>Pupuk</th>
-                          <th>I</th>
-                          <th>II</th>
+                          <th>Aplikasi I</th>
+                          <th>Aplikasi II</th>
                           <th>Total</th>
                         </tr>
                       </thead>
@@ -571,9 +708,7 @@ export default function AnalisisTanah({ token, onNavigate }) {
                           <td>Dolomit</td>
                           <td>{result.aplikasi1.dolomit}</td>
                           <td>{result.aplikasi2.dolomit}</td>
-                          <td>
-                            {totalPupuk(result.aplikasi1.dolomit, result.aplikasi2.dolomit)}
-                          </td>
+                          <td>{totalPupuk(result.aplikasi1.dolomit, result.aplikasi2.dolomit)}</td>
                         </tr>
 
                         <tr style={s.totalRow}>
@@ -587,7 +722,7 @@ export default function AnalisisTanah({ token, onNavigate }) {
                   </div>
 
                   <div style={s.recommendBox}>
-                    <div style={s.panelTag}>RECOMMENDATION</div>
+                    <div style={s.panelTag}>REKOMENDASI TINDAKAN</div>
 
                     {result.recommendations?.length ? (
                       result.recommendations.map((item, index) => (
@@ -607,21 +742,21 @@ export default function AnalisisTanah({ token, onNavigate }) {
             <section style={s.panel}>
               <div style={s.panelHeader}>
                 <div>
-                  <div style={s.panelTag}>ANALYSIS HISTORY</div>
-                  <h3 style={s.panelTitleSmall}>Tracking Record</h3>
+                  <div style={s.panelTag}>RIWAYAT ANALISIS</div>
+                  <h3 style={s.panelTitleSmall}>Perkembangan Titik</h3>
                 </div>
               </div>
 
               {!form.pointId ? (
                 <EmptyState
-                  title="Records Empty"
-                  text="Select field point to show analysis history."
+                  title="Riwayat Kosong"
+                  text="Pilih titik/lahan untuk menampilkan riwayat analisis."
                   compact
                 />
               ) : filteredHistory.length === 0 ? (
                 <EmptyState
-                  title="Records Empty"
-                  text="No history for selected field point."
+                  title="Riwayat Kosong"
+                  text="Belum ada riwayat analisis untuk titik ini."
                   compact
                 />
               ) : (
@@ -646,8 +781,8 @@ export default function AnalisisTanah({ token, onNavigate }) {
                       </div>
 
                       <div style={s.historyValue}>
-                        App I: {item.aplikasi1_total} | App II: {item.aplikasi2_total} | Total:{' '}
-                        {item.total_rekomendasi}
+                        Aplikasi I: {item.aplikasi1_total} | Aplikasi II:{' '}
+                        {item.aplikasi2_total} | Total: {item.total_rekomendasi}
                       </div>
                     </div>
                   ))}
@@ -709,19 +844,20 @@ const s = {
     minHeight: '100vh',
     display: 'grid',
     gridTemplateColumns: '250px 1fr',
-    background: colors.bg,
+    background: colors.cream,
     color: colors.text,
     fontFamily: 'Inter, system-ui, sans-serif',
   },
 
   sidebar: {
-    background: colors.sidebar,
-    borderRight: `1px solid ${colors.line}`,
+    background: colors.greenDark,
+    color: colors.white,
     padding: 22,
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
     minHeight: '100vh',
+    boxShadow: '18px 0 50px rgba(6, 78, 46, 0.13)',
   },
 
   logoBox: {
@@ -732,27 +868,25 @@ const s = {
   },
 
   logo: {
-    width: 42,
-    height: 42,
+    width: 54,
+    height: 54,
     borderRadius: 999,
-    background: '#fff',
-    padding: 4,
+    background: colors.white,
+    padding: 5,
+    border: `2px solid ${colors.greenPale}`,
   },
 
   logoText: {
     fontWeight: 900,
-    color: colors.soft,
-  },
-
-  logoSub: {
-    color: colors.muted,
-    fontSize: 11,
-    marginTop: 2,
+    color: colors.white,
+    letterSpacing: 0.2,
+    fontSize: 19,
+    lineHeight: 1.15,
   },
 
   nav: {
     display: 'grid',
-    gap: 8,
+    gap: 10,
   },
 
   navItem: {
@@ -762,20 +896,20 @@ const s = {
     alignItems: 'center',
     border: 'none',
     background: 'transparent',
-    color: colors.muted,
+    color: 'rgba(255,255,255,0.72)',
     padding: '13px 12px',
     textAlign: 'left',
     cursor: 'pointer',
-    fontWeight: 800,
+    fontWeight: 900,
     textTransform: 'uppercase',
     fontSize: 12,
     letterSpacing: 0.7,
+    borderRadius: 14,
   },
 
   navItemActive: {
-    background: 'rgba(70,171,104,0.14)',
-    color: colors.soft,
-    borderRight: `4px solid ${colors.medium}`,
+    background: colors.cream2,
+    color: colors.greenDark,
   },
 
   sidebarBottom: {
@@ -785,61 +919,34 @@ const s = {
 
   newBtn: {
     border: 'none',
-    background: colors.medium,
-    color: '#04140c',
+    background: colors.white,
+    color: colors.greenDark,
     padding: '13px 14px',
     fontWeight: 900,
     cursor: 'pointer',
     textTransform: 'uppercase',
     fontSize: 12,
     letterSpacing: 0.7,
+    borderRadius: 14,
+    boxShadow: '0 14px 28px rgba(0,0,0,0.12)',
   },
 
   sideSmallBtn: {
     border: 'none',
     background: 'transparent',
-    color: colors.muted,
+    color: 'rgba(255,255,255,0.78)',
     textAlign: 'left',
     cursor: 'pointer',
     fontSize: 11,
     letterSpacing: 1,
     textTransform: 'uppercase',
+    fontWeight: 700,
   },
 
   main: {
-    padding: '18px 24px',
-    background: `linear-gradient(180deg, ${colors.bg2}, #06130d)`,
+    padding: '28px 32px',
+    background: colors.cream,
     minWidth: 0,
-  },
-
-  searchRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: 14,
-    marginBottom: 26,
-  },
-
-  searchInput: {
-    width: 270,
-    maxWidth: '100%',
-    background: '#07170f',
-    border: `1px solid ${colors.line}`,
-    color: colors.soft,
-    padding: '10px 13px',
-    outline: 'none',
-    fontSize: 12,
-  },
-
-  topSelect: {
-    width: 340,
-    maxWidth: '100%',
-    background: colors.panel,
-    border: `1px solid ${colors.line}`,
-    color: colors.soft,
-    padding: '10px 12px',
-    fontWeight: 900,
-    textTransform: 'uppercase',
-    outline: 'none',
   },
 
   header: {
@@ -851,7 +958,7 @@ const s = {
   },
 
   eyebrow: {
-    color: colors.medium,
+    color: colors.green,
     fontWeight: 900,
     fontSize: 12,
     letterSpacing: 1.2,
@@ -861,31 +968,76 @@ const s = {
 
   title: {
     margin: 0,
-    color: colors.soft,
-    fontSize: 32,
+    color: colors.greenDeep,
+    fontSize: 34,
     letterSpacing: '-0.8px',
   },
 
   subtitle: {
     color: colors.muted,
-    marginTop: 6,
-    lineHeight: 1.6,
-    maxWidth: 650,
+    marginTop: 8,
+    lineHeight: 1.7,
+    maxWidth: 760,
   },
 
   backBtn: {
-    height: 40,
-    border: `1px solid ${colors.line}`,
-    background: 'transparent',
-    color: colors.soft,
+    height: 42,
+    border: `1px solid ${colors.borderStrong}`,
+    background: colors.white,
+    color: colors.greenDark,
     cursor: 'pointer',
-    padding: '0 12px',
+    padding: '0 14px',
     fontWeight: 900,
+    borderRadius: 14,
+    boxShadow: '0 10px 24px rgba(6,78,46,0.08)',
+  },
+
+  topBar: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    gap: 14,
+    marginBottom: 18,
+    flexWrap: 'wrap',
+  },
+
+  selectBox: {
+    display: 'grid',
+    gap: 7,
+  },
+
+  topLabel: {
+    fontSize: 12,
+    color: colors.greenDeep,
+    fontWeight: 900,
+    textTransform: 'uppercase',
+  },
+
+  topSelect: {
+    width: 360,
+    maxWidth: '100%',
+    background: colors.white,
+    border: `1px solid ${colors.border}`,
+    color: colors.text,
+    padding: '12px 14px',
+    fontWeight: 800,
+    outline: 'none',
+    borderRadius: 14,
+  },
+
+  exportBtn: {
+    border: 'none',
+    background: colors.greenDark,
+    color: colors.white,
+    padding: '12px 16px',
+    fontWeight: 900,
+    borderRadius: 14,
+    boxShadow: '0 12px 24px rgba(6,78,46,0.18)',
   },
 
   layout: {
     display: 'grid',
-    gridTemplateColumns: '1fr 380px',
+    gridTemplateColumns: '1fr 390px',
     gap: 18,
     alignItems: 'start',
   },
@@ -902,9 +1054,11 @@ const s = {
   },
 
   panel: {
-    background: colors.panel,
-    border: `1px solid ${colors.line}`,
-    padding: 18,
+    background: colors.white,
+    border: `1px solid ${colors.border}`,
+    padding: 20,
+    borderRadius: 24,
+    boxShadow: '0 14px 36px rgba(6,78,46,0.08)',
   },
 
   panelHeader: {
@@ -915,7 +1069,7 @@ const s = {
   },
 
   panelTag: {
-    color: colors.medium,
+    color: colors.green,
     fontSize: 11,
     fontWeight: 900,
     textTransform: 'uppercase',
@@ -925,18 +1079,18 @@ const s = {
 
   panelTitle: {
     margin: 0,
-    color: colors.soft,
-    fontSize: 20,
+    color: colors.greenDeep,
+    fontSize: 21,
   },
 
   panelTitleSmall: {
     margin: 0,
-    color: colors.soft,
-    fontSize: 16,
+    color: colors.greenDeep,
+    fontSize: 17,
   },
 
   updateText: {
-    color: 'rgba(227,254,211,.32)',
+    color: colors.muted,
     fontSize: 10,
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -949,10 +1103,11 @@ const s = {
   },
 
   nutrientCard: {
-    background: colors.panel2,
-    border: `1px solid ${colors.line}`,
+    background: colors.cream2,
+    border: `1px solid ${colors.border}`,
     padding: 16,
     minHeight: 128,
+    borderRadius: 18,
   },
 
   nutrientName: {
@@ -966,7 +1121,7 @@ const s = {
     fontSize: 34,
     lineHeight: 1,
     fontWeight: 900,
-    color: '#fff',
+    color: colors.green,
   },
 
   sourcePill: {
@@ -976,47 +1131,52 @@ const s = {
     fontSize: 10,
     fontWeight: 900,
     textTransform: 'uppercase',
+    borderRadius: 999,
   },
 
   sourceGeo: {
-    background: 'rgba(70,171,104,0.14)',
-    color: colors.pastel,
-    border: `1px solid ${colors.line}`,
+    background: colors.greenPale,
+    color: colors.greenDark,
+    border: `1px solid ${colors.border}`,
   },
 
   sourceDefault: {
-    background: 'rgba(227,254,211,0.06)',
+    background: colors.white,
     color: colors.muted,
-    border: `1px solid ${colors.line}`,
+    border: `1px solid ${colors.border}`,
   },
 
   mapWrap: {
     position: 'relative',
     overflow: 'hidden',
-    border: `1px solid ${colors.line}`,
-    filter: 'saturate(.65) brightness(.86)',
+    border: `1px solid ${colors.border}`,
+    borderRadius: 18,
   },
 
   coordBadge: {
     position: 'absolute',
     left: 14,
     bottom: 14,
-    background: colors.panel,
-    color: colors.medium,
+    background: colors.white,
+    color: colors.greenDark,
     padding: '8px 10px',
     fontWeight: 900,
     fontSize: 11,
     zIndex: 500,
+    borderRadius: 999,
+    border: `1px solid ${colors.border}`,
   },
 
   emptyMap: {
-    border: `1px dashed ${colors.line}`,
+    border: `1px dashed ${colors.borderStrong}`,
     padding: 34,
     color: colors.muted,
     textAlign: 'center',
     minHeight: 230,
     display: 'grid',
     placeItems: 'center',
+    background: colors.cream2,
+    borderRadius: 18,
   },
 
   inputGrid: {
@@ -1029,17 +1189,18 @@ const s = {
   formGroup: {
     display: 'grid',
     gap: 7,
-    color: colors.muted,
+    color: colors.greenDeep,
     fontSize: 12,
     fontWeight: 900,
   },
 
   input: {
-    background: colors.panel2,
-    border: `1px solid ${colors.line}`,
-    color: colors.soft,
+    background: colors.cream2,
+    border: `1px solid ${colors.border}`,
+    color: colors.text,
     padding: '12px 13px',
     outline: 'none',
+    borderRadius: 14,
   },
 
   actions: {
@@ -1050,29 +1211,34 @@ const s = {
   },
 
   outlineAction: {
-    border: `1px solid ${colors.line}`,
-    background: 'transparent',
-    color: colors.soft,
+    border: `1px solid ${colors.border}`,
+    background: colors.cream2,
+    color: colors.greenDark,
     padding: '12px 14px',
     cursor: 'pointer',
     fontWeight: 900,
+    borderRadius: 14,
   },
 
   primaryAction: {
     border: 'none',
-    background: colors.medium,
-    color: '#04140c',
+    background: colors.greenDark,
+    color: colors.white,
     padding: '12px 14px',
     cursor: 'pointer',
     fontWeight: 900,
+    borderRadius: 14,
+    boxShadow: '0 12px 24px rgba(6,78,46,0.18)',
   },
 
   savedChip: {
-    color: colors.pastel,
-    border: `1px solid ${colors.line}`,
+    color: colors.greenDark,
+    background: colors.greenPale,
+    border: `1px solid ${colors.border}`,
     padding: '6px 9px',
     fontSize: 11,
     fontWeight: 900,
+    borderRadius: 999,
   },
 
   resultGrid: {
@@ -1083,9 +1249,10 @@ const s = {
   },
 
   resultCard: {
-    background: colors.panel2,
-    border: `1px solid ${colors.line}`,
+    background: colors.cream2,
+    border: `1px solid ${colors.border}`,
     padding: 12,
+    borderRadius: 16,
   },
 
   resultLabel: {
@@ -1096,7 +1263,7 @@ const s = {
   },
 
   resultValue: {
-    color: '#fff',
+    color: colors.green,
     fontSize: 28,
     fontWeight: 900,
     marginTop: 8,
@@ -1104,7 +1271,8 @@ const s = {
 
   tableBox: {
     overflowX: 'auto',
-    border: `1px solid ${colors.line}`,
+    border: `1px solid ${colors.border}`,
+    borderRadius: 16,
   },
 
   table: {
@@ -1113,21 +1281,23 @@ const s = {
   },
 
   totalRow: {
-    background: 'rgba(70,171,104,0.10)',
+    background: colors.greenPale,
+    fontWeight: 900,
   },
 
   recommendBox: {
     marginTop: 14,
-    background: colors.panel2,
-    border: `1px solid ${colors.line}`,
+    background: colors.cream2,
+    border: `1px solid ${colors.border}`,
     padding: 14,
+    borderRadius: 18,
   },
 
   recommendItem: {
     display: 'grid',
     gridTemplateColumns: '24px 1fr',
     gap: 10,
-    color: colors.soft,
+    color: colors.text,
     fontSize: 13,
     lineHeight: 1.5,
   },
@@ -1135,16 +1305,20 @@ const s = {
   historyList: {
     display: 'grid',
     gap: 10,
+    maxHeight: 430,
+    overflowY: 'auto',
+    paddingRight: 6,
   },
 
   historyCard: {
-    background: colors.panel2,
-    border: `1px solid ${colors.line}`,
+    background: colors.cream2,
+    border: `1px solid ${colors.border}`,
     padding: 12,
+    borderRadius: 16,
   },
 
   historyActive: {
-    border: `1px solid ${colors.medium}`,
+    border: `1px solid ${colors.green}`,
   },
 
   historyTop: {
@@ -1154,7 +1328,7 @@ const s = {
   },
 
   historyName: {
-    color: colors.soft,
+    color: colors.greenDeep,
     fontWeight: 900,
   },
 
@@ -1166,45 +1340,50 @@ const s = {
 
   historyValue: {
     marginTop: 10,
-    color: colors.muted,
+    color: colors.text,
     fontSize: 12,
     lineHeight: 1.6,
   },
 
   detailBtn: {
-    border: `1px solid ${colors.line}`,
-    background: 'transparent',
-    color: colors.medium,
+    border: `1px solid ${colors.border}`,
+    background: colors.white,
+    color: colors.greenDark,
     fontWeight: 900,
     cursor: 'pointer',
     padding: '6px 8px',
+    borderRadius: 10,
   },
 
   emptyState: {
-    border: `1px dashed ${colors.line}`,
+    border: `1px dashed ${colors.borderStrong}`,
     minHeight: 180,
     display: 'grid',
     placeItems: 'center',
     textAlign: 'center',
     padding: 18,
+    background: colors.cream2,
+    borderRadius: 18,
   },
 
   emptyCompact: {
-    border: `1px dashed ${colors.line}`,
+    border: `1px dashed ${colors.borderStrong}`,
     minHeight: 120,
     display: 'grid',
     placeItems: 'center',
     textAlign: 'center',
     padding: 14,
+    background: colors.cream2,
+    borderRadius: 18,
   },
 
   emptyIcon: {
-    color: colors.medium,
+    color: colors.green,
     fontSize: 26,
   },
 
   emptyTitle: {
-    color: colors.soft,
+    color: colors.greenDeep,
     fontWeight: 900,
   },
 
@@ -1222,6 +1401,7 @@ const css = `
 
   body {
     margin: 0;
+    background: ${colors.cream};
   }
 
   button,
@@ -1240,31 +1420,63 @@ const css = `
   }
 
   input::placeholder {
-    color: rgba(227,254,211,.35);
+    color: rgba(18, 53, 31, 0.36);
+  }
+
+  input:focus,
+  select:focus {
+    border-color: rgba(6, 78, 46, 0.34) !important;
+    box-shadow: 0 0 0 3px rgba(70, 171, 104, 0.12);
+    background: #ffffff !important;
   }
 
   select option {
-    background: #0b2417;
-    color: #E3FED3;
+    background: ${colors.cream2};
+    color: ${colors.text};
   }
 
   table th,
   table td {
     padding: 10px;
-    border-bottom: 1px solid rgba(148,212,157,.12);
-    color: #E3FED3;
+    border-bottom: 1px solid rgba(6, 78, 46, 0.12);
+    color: ${colors.text};
     text-align: left;
     font-size: 12px;
   }
 
   table th {
-    color: rgba(227,254,211,.55);
+    color: ${colors.greenDeep};
     font-weight: 900;
     text-transform: uppercase;
+    background: ${colors.cream2};
+  }
+
+  div::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  div::-webkit-scrollbar-track {
+    background: rgba(6, 78, 46, 0.06);
+    border-radius: 999px;
+  }
+
+  div::-webkit-scrollbar-thumb {
+    background: rgba(6, 78, 46, 0.28);
+    border-radius: 999px;
+  }
+
+  div::-webkit-scrollbar-thumb:hover {
+    background: rgba(6, 78, 46, 0.42);
   }
 
   .leaflet-container {
-    background: #0b2417;
+    background: ${colors.cream2};
+  }
+
+  .leaflet-popup-content-wrapper,
+  .leaflet-popup-tip {
+    background: ${colors.white};
+    color: ${colors.text};
   }
 
   @media (max-width: 1180px) {
@@ -1276,7 +1488,7 @@ const css = `
       display: none !important;
     }
 
-    div[style*="grid-template-columns: 1fr 380px"] {
+    div[style*="grid-template-columns: 1fr 390px"] {
       grid-template-columns: 1fr !important;
     }
 

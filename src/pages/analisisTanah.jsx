@@ -28,6 +28,22 @@ const colors = {
   dangerDark: '#991b1b',
 };
 
+const LOGO_SRC = '/ppks.png';
+
+const ICONS = {
+  dashboard: 'https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/layout-dashboard.svg',
+  digitasi: 'https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/map-pinned.svg',
+  laporan: 'https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/file-text.svg',
+  analisis: 'https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/flask-conical.svg',
+  settings: 'https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/settings.svg',
+  logout: 'https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/log-out.svg',
+  plus: 'https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/plus-circle.svg',
+  mapPin: 'https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/map-pin.svg',
+  fileDown: 'https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/file-down.svg',
+  empty: 'https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/archive-x.svg',
+  calculator: 'https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/calculator.svg',
+};
+
 const EMPTY_FORM = {
   pointId: '',
   pointName: '',
@@ -50,7 +66,24 @@ const EMPTY_FORM = {
   jumlahPohon: '',
 };
 
-export default function AnalisisTanah({ token, onNavigate }) {
+function Icon({ src, size = 22, color = colors.green, style }) {
+  return (
+    <span
+      style={{
+        width: size,
+        height: size,
+        display: 'inline-block',
+        background: color,
+        WebkitMask: `url(${src}) center / contain no-repeat`,
+        mask: `url(${src}) center / contain no-repeat`,
+        flex: `0 0 ${size}px`,
+        ...style,
+      }}
+    />
+  );
+}
+
+export default function AnalisisTanah({ token, onNavigate, onLogout }) {
   const [points, setPoints] = useState([]);
   const [history, setHistory] = useState([]);
   const [result, setResult] = useState(null);
@@ -237,7 +270,7 @@ export default function AnalisisTanah({ token, onNavigate }) {
   }, [history, form.pointId]);
 
   const formatSourceLabel = (source) => {
-    if (source === 'geojson-gridcode') return 'GeoJSON ';
+    if (source === 'geojson-gridcode') return 'GeoJSON';
     if (source === 'geojson') return 'GeoJSON';
     if (source === 'default') return 'Default Sistem';
     return source || '-';
@@ -318,6 +351,7 @@ export default function AnalisisTanah({ token, onNavigate }) {
             }
           </style>
         </head>
+
         <body>
           <h2>Hasil Analisis Tanah</h2>
 
@@ -431,9 +465,9 @@ export default function AnalisisTanah({ token, onNavigate }) {
       <style>{css}</style>
 
       <aside style={s.sidebar}>
-        <div>
+        <div style={s.sidebarTop}>
           <div style={s.logoBox}>
-            <img src="/ppks.png" alt="Monitoring Hara" style={s.logo} />
+            <img src={LOGO_SRC} alt="Monitoring Hara" style={s.logo} />
             <div>
               <div style={s.logoText}>Monitoring</div>
               <div style={s.logoText}>Hara</div>
@@ -441,30 +475,76 @@ export default function AnalisisTanah({ token, onNavigate }) {
           </div>
 
           <nav style={s.nav}>
-            <button style={s.navItem} onClick={() => onNavigate('user-dashboard')}>
-              Dashboard
-            </button>
+            <NavItem
+              label="Dashboard"
+              icon={ICONS.dashboard}
+              onClick={() => onNavigate('user-dashboard')}
+            />
 
-            <button style={s.navItem} onClick={() => onNavigate('digitasi')}>
-              Digitasi
-            </button>
+            <NavItem
+              label="Digitasi"
+              icon={ICONS.digitasi}
+              onClick={() => onNavigate('digitasi')}
+            />
 
-            <button style={s.navItem} onClick={() => onNavigate('laporan')}>
-              Laporan
-            </button>
+            <NavItem
+              label="Laporan"
+              icon={ICONS.laporan}
+              onClick={() => onNavigate('laporan')}
+            />
 
-            <button style={{ ...s.navItem, ...s.navItemActive }}>
-              Analisis Tanah
-            </button>
+            <NavItem
+              label="Analisis Tanah"
+              icon={ICONS.analisis}
+              active
+              onClick={() => onNavigate('analisis-tanah')}
+            />
           </nav>
+        </div>
+
+        <div style={s.sidebarBottom}>
+          <button style={s.newBtn} onClick={() => onNavigate('digitasi')}>
+            <Icon src={ICONS.plus} size={18} color={colors.greenDark} />
+            Buat Titik Baru
+          </button>
+
+          <button style={s.sideSmallBtn} type="button">
+            <Icon src={ICONS.settings} size={18} color="rgba(255,255,255,0.82)" />
+            Pengaturan
+          </button>
+
+          <button
+            style={s.sideSmallBtn}
+            type="button"
+            onClick={() => {
+              if (typeof onLogout === 'function') {
+                onLogout();
+              } else {
+                localStorage.removeItem('token');
+                onNavigate('login');
+              }
+            }}
+          >
+            <Icon src={ICONS.logout} size={18} color="rgba(255,255,255,0.82)" />
+            Keluar
+          </button>
         </div>
       </aside>
 
       <main style={s.main}>
         <header style={s.header}>
           <div>
-            <h1 style={s.title}> Analisis Kandungan Tanah</h1>
+            <div style={s.eyebrow}>Analisis Tanah</div>
+            <h1 style={s.title}>Analisis Kandungan Tanah</h1>
+            <p style={s.subtitle}>
+              Pilih titik lahan, ambil kandungan unsur dari GeoJSON, lalu hitung rekomendasi pupuk
+              berdasarkan parameter produksi.
+            </p>
           </div>
+
+          <button style={s.backBtn} onClick={() => onNavigate('user-dashboard')}>
+            ← Dashboard
+          </button>
         </header>
 
         <div style={s.topBar}>
@@ -493,6 +573,7 @@ export default function AnalisisTanah({ token, onNavigate }) {
             onClick={exportExcel}
             disabled={!result}
           >
+            <Icon src={ICONS.fileDown} size={18} color={colors.white} />
             Export ke Excel
           </button>
         </div>
@@ -502,7 +583,7 @@ export default function AnalisisTanah({ token, onNavigate }) {
             <section style={s.panel}>
               <div style={s.panelHeader}>
                 <div>
-                  <div style={s.panelTag}>KANDUNGAN DAUN (%)</div>
+                  <div style={s.panelTag}>Kandungan Daun (%)</div>
                   <h3 style={s.panelTitle}>Konsentrasi Unsur Hara</h3>
                 </div>
 
@@ -545,7 +626,7 @@ export default function AnalisisTanah({ token, onNavigate }) {
             <section style={s.panel}>
               <div style={s.panelHeader}>
                 <div>
-                  <div style={s.panelTag}>PETA LOKASI</div>
+                  <div style={s.panelTag}>Peta Lokasi</div>
                   <h3 style={s.panelTitle}>Lokasi Titik Lahan</h3>
                 </div>
 
@@ -554,7 +635,7 @@ export default function AnalisisTanah({ token, onNavigate }) {
 
               {!hasMap ? (
                 <div style={s.emptyMap}>
-                  <div style={s.emptyIcon}>▧</div>
+                  <Icon src={ICONS.mapPin} size={38} color={colors.green} />
                   <div style={s.emptyTitle}>Belum Ada Lokasi Aktif</div>
                   <div style={s.emptyText}>
                     Pilih titik/lahan terlebih dahulu untuk menampilkan lokasi pada peta.
@@ -604,7 +685,7 @@ export default function AnalisisTanah({ token, onNavigate }) {
             <section style={s.panel}>
               <div style={s.panelHeader}>
                 <div>
-                  <div style={s.panelTag}>INPUT PARAMETER</div>
+                  <div style={s.panelTag}>Input Parameter</div>
                   <h3 style={s.panelTitle}>Parameter Produksi</h3>
                 </div>
               </div>
@@ -637,10 +718,12 @@ export default function AnalisisTanah({ token, onNavigate }) {
 
               <div style={s.actions}>
                 <button style={s.outlineAction} onClick={hitung}>
+                  <Icon src={ICONS.calculator} size={17} color={colors.greenDark} />
                   Hitung
                 </button>
 
                 <button style={s.primaryAction} onClick={simpan}>
+                  <Icon src={ICONS.analisis} size={17} color={colors.white} />
                   Hitung & Simpan
                 </button>
               </div>
@@ -651,7 +734,7 @@ export default function AnalisisTanah({ token, onNavigate }) {
             <section style={s.panel}>
               <div style={s.panelHeader}>
                 <div>
-                  <div style={s.panelTag}>RINGKASAN ANALISIS</div>
+                  <div style={s.panelTag}>Ringkasan Analisis</div>
                   <h3 style={s.panelTitleSmall}>Hasil Rekomendasi</h3>
                 </div>
 
@@ -722,7 +805,7 @@ export default function AnalisisTanah({ token, onNavigate }) {
                   </div>
 
                   <div style={s.recommendBox}>
-                    <div style={s.panelTag}>REKOMENDASI TINDAKAN</div>
+                    <div style={s.panelTag}>Rekomendasi Tindakan</div>
 
                     {result.recommendations?.length ? (
                       result.recommendations.map((item, index) => (
@@ -742,7 +825,7 @@ export default function AnalisisTanah({ token, onNavigate }) {
             <section style={s.panel}>
               <div style={s.panelHeader}>
                 <div>
-                  <div style={s.panelTag}>RIWAYAT ANALISIS</div>
+                  <div style={s.panelTag}>Riwayat Analisis</div>
                   <h3 style={s.panelTitleSmall}>Perkembangan Titik</h3>
                 </div>
               </div>
@@ -796,6 +879,27 @@ export default function AnalisisTanah({ token, onNavigate }) {
   );
 }
 
+function NavItem({ icon, label, active, onClick }) {
+  return (
+    <button
+      style={{
+        ...s.navItem,
+        ...(active ? s.navItemActive : {}),
+      }}
+      onClick={onClick}
+    >
+      <span style={s.navIcon}>
+        <Icon
+          src={icon}
+          size={24}
+          color={active ? colors.greenDark : 'rgba(255,255,255,0.78)'}
+        />
+      </span>
+      <span>{label}</span>
+    </button>
+  );
+}
+
 function InputField({ label, value, onChange }) {
   return (
     <label style={s.formGroup}>
@@ -832,7 +936,7 @@ function ResultCard({ label, value }) {
 function EmptyState({ title, text, compact }) {
   return (
     <div style={compact ? s.emptyCompact : s.emptyState}>
-      <div style={s.emptyIcon}>▧</div>
+      <Icon src={ICONS.empty} size={38} color={colors.green} />
       <div style={s.emptyTitle}>{title}</div>
       <div style={s.emptyText}>{text}</div>
     </div>
@@ -850,14 +954,21 @@ const s = {
   },
 
   sidebar: {
+    position: 'sticky',
+    top: 0,
+    height: '100vh',
     background: colors.greenDark,
     color: colors.white,
     padding: 22,
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
-    minHeight: '100vh',
+    overflow: 'hidden',
     boxShadow: '18px 0 50px rgba(6, 78, 46, 0.13)',
+  },
+
+  sidebarTop: {
+    minHeight: 0,
   },
 
   logoBox: {
@@ -892,18 +1003,18 @@ const s = {
   navItem: {
     width: '100%',
     display: 'flex',
-    gap: 12,
     alignItems: 'center',
+    gap: 13,
     border: 'none',
     background: 'transparent',
     color: 'rgba(255,255,255,0.72)',
     padding: '13px 12px',
-    textAlign: 'left',
     cursor: 'pointer',
+    fontSize: 13,
     fontWeight: 900,
+    letterSpacing: 0.9,
     textTransform: 'uppercase',
-    fontSize: 12,
-    letterSpacing: 0.7,
+    textAlign: 'left',
     borderRadius: 14,
   },
 
@@ -912,12 +1023,23 @@ const s = {
     color: colors.greenDark,
   },
 
+  navIcon: {
+    width: 32,
+    height: 32,
+    display: 'inline-grid',
+    placeItems: 'center',
+    flex: '0 0 32px',
+  },
+
   sidebarBottom: {
     display: 'grid',
     gap: 14,
+    paddingTop: 18,
+    flexShrink: 0,
   },
 
   newBtn: {
+    width: '100%',
     border: 'none',
     background: colors.white,
     color: colors.greenDark,
@@ -929,15 +1051,22 @@ const s = {
     letterSpacing: 0.7,
     borderRadius: 14,
     boxShadow: '0 14px 28px rgba(0,0,0,0.12)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
   },
 
   sideSmallBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 9,
     border: 'none',
     background: 'transparent',
     color: 'rgba(255,255,255,0.78)',
     textAlign: 'left',
     cursor: 'pointer',
-    fontSize: 11,
+    fontSize: 12,
     letterSpacing: 1,
     textTransform: 'uppercase',
     fontWeight: 700,
@@ -1033,6 +1162,9 @@ const s = {
     fontWeight: 900,
     borderRadius: 14,
     boxShadow: '0 12px 24px rgba(6,78,46,0.18)',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
   },
 
   layout: {
@@ -1218,6 +1350,9 @@ const s = {
     cursor: 'pointer',
     fontWeight: 900,
     borderRadius: 14,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
   },
 
   primaryAction: {
@@ -1229,6 +1364,9 @@ const s = {
     fontWeight: 900,
     borderRadius: 14,
     boxShadow: '0 12px 24px rgba(6,78,46,0.18)',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 8,
   },
 
   savedChip: {
@@ -1377,11 +1515,6 @@ const s = {
     borderRadius: 18,
   },
 
-  emptyIcon: {
-    color: colors.green,
-    fontSize: 26,
-  },
-
   emptyTitle: {
     color: colors.greenDeep,
     fontWeight: 900,
@@ -1485,7 +1618,13 @@ const css = `
     }
 
     aside {
-      display: none !important;
+      position: static !important;
+      height: auto !important;
+      min-height: auto !important;
+    }
+
+    nav {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     div[style*="grid-template-columns: 1fr 390px"] {

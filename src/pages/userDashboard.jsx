@@ -348,15 +348,18 @@ const s = {
   },
 
   sidebar: {
-    background: colors.greenDark,
-    color: colors.white,
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'space-between',
-    padding: 22,
-    minHeight: '100vh',
-    boxShadow: '18px 0 50px rgba(6, 78, 46, 0.13)',
-  },
+  position: 'sticky',
+  top: 0,
+  height: '100vh',
+  background: colors.greenDark,
+  color: colors.white,
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'space-between',
+  padding: 22,
+  overflow: 'hidden',
+  boxShadow: '18px 0 50px rgba(6, 78, 46, 0.13)',
+},
 
   logoBox: {
     display: 'flex',

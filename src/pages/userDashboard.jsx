@@ -130,18 +130,8 @@ export default function UserDashboard({ token, currentUser, onNavigate, onLogout
         </div>
 
         <div style={s.sidebarBottom}>
-          <button style={s.newBtn} onClick={() => onNavigate('digitasi')}>
-            <Icon src={ICONS.plus} size={18} color={colors.greenDark} />
-            Buat Titik Baru
-          </button>
-
-          <button style={s.sideSmallBtn}>
-            <Icon src={ICONS.settings} size={18} color="rgba(255,255,255,0.82)" />
-            Pengaturan
-          </button>
-
-          <button style={s.sideSmallBtn} onClick={onLogout}>
-            <Icon src={ICONS.logout} size={18} color="rgba(255,255,255,0.82)" />
+          <button style={s.newBtn} onClick={onLogout}>
+            <Icon src={ICONS.logout} size={25} color="rgba(217, 22, 22, 0.82)" />
             Keluar
           </button>
         </div>
@@ -155,11 +145,6 @@ export default function UserDashboard({ token, currentUser, onNavigate, onLogout
               Pantau titik lahan, aktivitas digitasi, dan laporan terbaru dalam satu dashboard.
             </p>
           </div>
-
-          <button style={s.primaryBtn} onClick={() => onNavigate('analisis-tanah')}>
-            <Icon src={ICONS.analisis} size={18} color={colors.white} />
-            Analisis Tanah
-          </button>
         </section>
 
         <section style={s.summaryGrid}>
@@ -284,13 +269,6 @@ export default function UserDashboard({ token, currentUser, onNavigate, onLogout
             </div>
           </div>
         </section>
-
-        <footer style={s.footer}>
-          <span>© 2026 Sistem Monitoring Hara</span>
-          <span>Kebijakan Privasi</span>
-          <span>Syarat Layanan</span>
-          <span>Bantuan Sistem</span>
-        </footer>
       </main>
     </div>
   );

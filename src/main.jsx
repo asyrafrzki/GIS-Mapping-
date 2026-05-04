@@ -91,6 +91,8 @@ function Root() {
     <AnalisisTanah
       token={session.token}
       onNavigate={setPage}
+      onLogout={handleLogout}
+      
     />
   );
 }

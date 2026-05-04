@@ -503,29 +503,8 @@ export default function AnalisisTanah({ token, onNavigate, onLogout }) {
         </div>
 
         <div style={s.sidebarBottom}>
-          <button style={s.newBtn} onClick={() => onNavigate('digitasi')}>
-            <Icon src={ICONS.plus} size={18} color={colors.greenDark} />
-            Buat Titik Baru
-          </button>
-
-          <button style={s.sideSmallBtn} type="button">
-            <Icon src={ICONS.settings} size={18} color="rgba(255,255,255,0.82)" />
-            Pengaturan
-          </button>
-
-          <button
-            style={s.sideSmallBtn}
-            type="button"
-            onClick={() => {
-              if (typeof onLogout === 'function') {
-                onLogout();
-              } else {
-                localStorage.removeItem('token');
-                onNavigate('login');
-              }
-            }}
-          >
-            <Icon src={ICONS.logout} size={18} color="rgba(255,255,255,0.82)" />
+         <button style={s.newBtn} onClick={onLogout}>
+            <Icon src={ICONS.logout} size={25} color="rgba(217, 22, 22, 0.82)" />
             Keluar
           </button>
         </div>
@@ -534,17 +513,8 @@ export default function AnalisisTanah({ token, onNavigate, onLogout }) {
       <main style={s.main}>
         <header style={s.header}>
           <div>
-            <div style={s.eyebrow}>Analisis Tanah</div>
             <h1 style={s.title}>Analisis Kandungan Tanah</h1>
-            <p style={s.subtitle}>
-              Pilih titik lahan, ambil kandungan unsur dari GeoJSON, lalu hitung rekomendasi pupuk
-              berdasarkan parameter produksi.
-            </p>
           </div>
-
-          <button style={s.backBtn} onClick={() => onNavigate('user-dashboard')}>
-            ← Dashboard
-          </button>
         </header>
 
         <div style={s.topBar}>

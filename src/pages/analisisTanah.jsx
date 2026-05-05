@@ -35,9 +35,7 @@ const ICONS = {
   digitasi: 'https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/map-pinned.svg',
   laporan: 'https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/file-text.svg',
   analisis: 'https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/flask-conical.svg',
-  settings: 'https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/settings.svg',
   logout: 'https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/log-out.svg',
-  plus: 'https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/plus-circle.svg',
   mapPin: 'https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/map-pin.svg',
   fileDown: 'https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/file-down.svg',
   empty: 'https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/archive-x.svg',
@@ -83,6 +81,66 @@ function Icon({ src, size = 22, color = colors.green, style }) {
   );
 }
 
+function splitAdminRecommendation(row) {
+  const text =
+    row?.admin_note ||
+    row?.admin_recommendation ||
+    row?.rekomendasi_admin ||
+    row?.catatan_admin ||
+    '';
+
+  if (!text) return [];
+
+  return String(text)
+    .split('\n')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function normalizeResult(result, row = null) {
+  if (!result) return null;
+
+  return {
+    summary: {
+      aplikasi1_total: Number(result.summary?.aplikasi1_total ?? result.aplikasi1_total ?? 0),
+      aplikasi2_total: Number(result.summary?.aplikasi2_total ?? result.aplikasi2_total ?? 0),
+      total_rekomendasi: Number(result.summary?.total_rekomendasi ?? result.total_rekomendasi ?? 0),
+    },
+    aplikasi1: {
+      urea: Number(result.aplikasi1?.urea ?? result.urea_app1 ?? 0),
+      tsp: Number(result.aplikasi1?.tsp ?? result.tsp_app1 ?? 0),
+      kcl: Number(result.aplikasi1?.kcl ?? result.kcl_app1 ?? 0),
+      dolomit: Number(result.aplikasi1?.dolomit ?? result.dolomit_app1 ?? 0),
+    },
+    aplikasi2: {
+      urea: Number(result.aplikasi2?.urea ?? result.urea_app2 ?? 0),
+      tsp: Number(result.aplikasi2?.tsp ?? result.tsp_app2 ?? 0),
+      kcl: Number(result.aplikasi2?.kcl ?? result.kcl_app2 ?? 0),
+      dolomit: Number(result.aplikasi2?.dolomit ?? result.dolomit_app2 ?? 0),
+    },
+    recommendations: splitAdminRecommendation(row || result),
+  };
+}
+
+function buildResultFromHistory(row) {
+  return normalizeResult(
+    {
+      aplikasi1_total: row.aplikasi1_total,
+      aplikasi2_total: row.aplikasi2_total,
+      total_rekomendasi: row.total_rekomendasi,
+      urea_app1: row.urea_app1,
+      tsp_app1: row.tsp_app1,
+      kcl_app1: row.kcl_app1,
+      dolomit_app1: row.dolomit_app1,
+      urea_app2: row.urea_app2,
+      tsp_app2: row.tsp_app2,
+      kcl_app2: row.kcl_app2,
+      dolomit_app2: row.dolomit_app2,
+    },
+    row
+  );
+}
+
 export default function AnalisisTanah({ token, onNavigate, onLogout }) {
   const [points, setPoints] = useState([]);
   const [history, setHistory] = useState([]);
@@ -93,7 +151,7 @@ export default function AnalisisTanah({ token, onNavigate, onLogout }) {
   const loadPoints = async () => {
     try {
       const data = await apiRequest('/analisis-tanah/points', { token });
-      setPoints(data);
+      setPoints(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
     }
@@ -102,7 +160,7 @@ export default function AnalisisTanah({ token, onNavigate, onLogout }) {
   const loadHistory = async () => {
     try {
       const data = await apiRequest('/analisis-tanah/history', { token });
-      setHistory(data);
+      setHistory(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
     }
@@ -112,34 +170,6 @@ export default function AnalisisTanah({ token, onNavigate, onLogout }) {
     loadPoints();
     loadHistory();
   }, [token]);
-
-  const buildRecommendationsFromHistory = () => [
-    'Hasil ini berasal dari analisis yang sudah tersimpan.',
-    'Lakukan evaluasi ulang setelah aplikasi II untuk memastikan respon tanaman.',
-  ];
-
-  const buildResultFromHistory = (row) => ({
-    summary: {
-      aplikasi1_total: Number(row.aplikasi1_total),
-      aplikasi2_total: Number(row.aplikasi2_total),
-      total_rekomendasi: Number(row.total_rekomendasi),
-    },
-    aplikasi1: {
-      urea: Number(row.urea_app1),
-      tsp: Number(row.tsp_app1),
-      kcl: Number(row.kcl_app1),
-      dolomit: Number(row.dolomit_app1),
-      total: Number(row.aplikasi1_total),
-    },
-    aplikasi2: {
-      urea: Number(row.urea_app2),
-      tsp: Number(row.tsp_app2),
-      kcl: Number(row.kcl_app2),
-      dolomit: Number(row.dolomit_app2),
-      total: Number(row.aplikasi2_total),
-    },
-    recommendations: buildRecommendationsFromHistory(),
-  });
 
   const handleSelectPoint = async (pointId) => {
     if (!pointId) {
@@ -204,7 +234,7 @@ export default function AnalisisTanah({ token, onNavigate, onLogout }) {
         },
       });
 
-      setResult(data);
+      setResult(normalizeResult(data, null));
       setSelectedHistoryId(null);
     } catch (err) {
       alert(err.message);
@@ -225,9 +255,10 @@ export default function AnalisisTanah({ token, onNavigate, onLogout }) {
         },
       });
 
-      setResult(data.result);
+      const savedRow = data.data || null;
+      setResult(normalizeResult(data.result, savedRow));
       await loadHistory();
-      setSelectedHistoryId(data.data.id);
+      setSelectedHistoryId(savedRow?.id || null);
       alert('Analisis berhasil disimpan.');
     } catch (err) {
       alert(err.message);
@@ -313,45 +344,25 @@ export default function AnalisisTanah({ token, onNavigate, onLogout }) {
     const tanggalExport = new Date().toLocaleString('id-ID');
     const namaFile = `hasil-analisis-${safeFileName(form.pointName)}.xls`;
 
+    const adminRecommendationRows = result.recommendations?.length
+      ? result.recommendations
+          .map((item, index) => `<tr><td>${index + 1}. ${item}</td></tr>`)
+          .join('')
+      : '<tr><td>Belum ada rekomendasi dari admin.</td></tr>';
+
     const html = `
       <html>
         <head>
           <meta charset="UTF-8" />
           <style>
-            body {
-              font-family: Arial, sans-serif;
-            }
-
-            h2 {
-              color: #03351F;
-            }
-
-            table {
-              border-collapse: collapse;
-              width: 100%;
-              margin-bottom: 18px;
-            }
-
-            th {
-              background: #076138;
-              color: #ffffff;
-              font-weight: bold;
-            }
-
-            th, td {
-              border: 1px solid #b7d8bf;
-              padding: 8px;
-              font-size: 12px;
-            }
-
-            .section {
-              background: #E3FED3;
-              color: #03351F;
-              font-weight: bold;
-            }
+            body { font-family: Arial, sans-serif; }
+            h2 { color: #03351F; }
+            table { border-collapse: collapse; width: 100%; margin-bottom: 18px; }
+            th { background: #076138; color: #ffffff; font-weight: bold; }
+            th, td { border: 1px solid #b7d8bf; padding: 8px; font-size: 12px; }
+            .section { background: #E3FED3; color: #03351F; font-weight: bold; }
           </style>
         </head>
-
         <body>
           <h2>Hasil Analisis Tanah</h2>
 
@@ -368,11 +379,7 @@ export default function AnalisisTanah({ token, onNavigate, onLogout }) {
 
           <table>
             <tr><td class="section" colspan="3">Kandungan Daun (%)</td></tr>
-            <tr>
-              <th>Unsur</th>
-              <th>Nilai</th>
-              <th>Sumber Data</th>
-            </tr>
+            <tr><th>Unsur</th><th>Nilai</th><th>Sumber Data</th></tr>
             <tr><td>Nitrogen (N)</td><td>${form.n || '-'}</td><td>${formatSourceLabel(form.nSource)}</td></tr>
             <tr><td>Fosfor (P)</td><td>${form.p || '-'}</td><td>${formatSourceLabel(form.pSource)}</td></tr>
             <tr><td>Kalium (K)</td><td>${form.k || '-'}</td><td>${formatSourceLabel(form.kSource)}</td></tr>
@@ -387,53 +394,17 @@ export default function AnalisisTanah({ token, onNavigate, onLogout }) {
 
           <table>
             <tr><td class="section" colspan="4">Rincian Rekomendasi Pupuk</td></tr>
-            <tr>
-              <th>Jenis Pupuk</th>
-              <th>Aplikasi I</th>
-              <th>Aplikasi II</th>
-              <th>Total</th>
-            </tr>
-            <tr>
-              <td>Urea</td>
-              <td>${result.aplikasi1.urea}</td>
-              <td>${result.aplikasi2.urea}</td>
-              <td>${totalPupuk(result.aplikasi1.urea, result.aplikasi2.urea)}</td>
-            </tr>
-            <tr>
-              <td>TSP</td>
-              <td>${result.aplikasi1.tsp}</td>
-              <td>${result.aplikasi2.tsp}</td>
-              <td>${totalPupuk(result.aplikasi1.tsp, result.aplikasi2.tsp)}</td>
-            </tr>
-            <tr>
-              <td>KCl</td>
-              <td>${result.aplikasi1.kcl}</td>
-              <td>${result.aplikasi2.kcl}</td>
-              <td>${totalPupuk(result.aplikasi1.kcl, result.aplikasi2.kcl)}</td>
-            </tr>
-            <tr>
-              <td>Dolomit</td>
-              <td>${result.aplikasi1.dolomit}</td>
-              <td>${result.aplikasi2.dolomit}</td>
-              <td>${totalPupuk(result.aplikasi1.dolomit, result.aplikasi2.dolomit)}</td>
-            </tr>
-            <tr>
-              <th>Total</th>
-              <th>${result.summary.aplikasi1_total}</th>
-              <th>${result.summary.aplikasi2_total}</th>
-              <th>${result.summary.total_rekomendasi}</th>
-            </tr>
+            <tr><th>Jenis Pupuk</th><th>Aplikasi I</th><th>Aplikasi II</th><th>Total</th></tr>
+            <tr><td>Urea</td><td>${result.aplikasi1.urea}</td><td>${result.aplikasi2.urea}</td><td>${totalPupuk(result.aplikasi1.urea, result.aplikasi2.urea)}</td></tr>
+            <tr><td>TSP</td><td>${result.aplikasi1.tsp}</td><td>${result.aplikasi2.tsp}</td><td>${totalPupuk(result.aplikasi1.tsp, result.aplikasi2.tsp)}</td></tr>
+            <tr><td>KCl</td><td>${result.aplikasi1.kcl}</td><td>${result.aplikasi2.kcl}</td><td>${totalPupuk(result.aplikasi1.kcl, result.aplikasi2.kcl)}</td></tr>
+            <tr><td>Dolomit</td><td>${result.aplikasi1.dolomit}</td><td>${result.aplikasi2.dolomit}</td><td>${totalPupuk(result.aplikasi1.dolomit, result.aplikasi2.dolomit)}</td></tr>
+            <tr><th>Total</th><th>${result.summary.aplikasi1_total}</th><th>${result.summary.aplikasi2_total}</th><th>${result.summary.total_rekomendasi}</th></tr>
           </table>
 
           <table>
-            <tr><td class="section">Rekomendasi Tindakan</td></tr>
-            ${
-              result.recommendations?.length
-                ? result.recommendations
-                    .map((item, index) => `<tr><td>${index + 1}. ${item}</td></tr>`)
-                    .join('')
-                : '<tr><td>Belum ada rekomendasi.</td></tr>'
-            }
+            <tr><td class="section">Rekomendasi Admin</td></tr>
+            ${adminRecommendationRows}
           </table>
         </body>
       </html>
@@ -464,7 +435,7 @@ export default function AnalisisTanah({ token, onNavigate, onLogout }) {
     <div style={s.shell}>
       <style>{css}</style>
 
-      <aside style={s.sidebar}>
+      <aside className="sidebar-analisis" style={s.sidebar}>
         <div style={s.sidebarTop}>
           <div style={s.logoBox}>
             <img src={LOGO_SRC} alt="Monitoring Hara" style={s.logo} />
@@ -503,14 +474,21 @@ export default function AnalisisTanah({ token, onNavigate, onLogout }) {
         </div>
 
         <div style={s.sidebarBottom}>
-         <button style={s.newBtn} onClick={onLogout}>
+          <button
+            style={s.logoutBtn}
+            onClick={() => {
+              if (typeof onLogout === 'function') {
+                onLogout();
+              }
+            }}
+          >
             <Icon src={ICONS.logout} size={25} color="rgba(217, 22, 22, 0.82)" />
             Keluar
           </button>
         </div>
       </aside>
 
-      <main style={s.main}>
+      <main className="main-analisis" style={s.main}>
         <header style={s.header}>
           <div>
             <h1 style={s.title}>Analisis Kandungan Tanah</h1>
@@ -775,7 +753,7 @@ export default function AnalisisTanah({ token, onNavigate, onLogout }) {
                   </div>
 
                   <div style={s.recommendBox}>
-                    <div style={s.panelTag}>Rekomendasi Tindakan</div>
+                    <div style={s.panelTag}>Rekomendasi Admin</div>
 
                     {result.recommendations?.length ? (
                       result.recommendations.map((item, index) => (
@@ -785,7 +763,7 @@ export default function AnalisisTanah({ token, onNavigate, onLogout }) {
                         </div>
                       ))
                     ) : (
-                      <div style={s.emptyText}>Belum ada rekomendasi.</div>
+                      <div style={s.emptyText}>Belum ada rekomendasi dari admin.</div>
                     )}
                   </div>
                 </>
@@ -915,17 +893,19 @@ function EmptyState({ title, text, compact }) {
 
 const s = {
   shell: {
+    width: '100%',
     minHeight: '100vh',
-    display: 'grid',
-    gridTemplateColumns: '250px 1fr',
     background: colors.cream,
     color: colors.text,
     fontFamily: 'Inter, system-ui, sans-serif',
+    overflowX: 'hidden',
   },
 
   sidebar: {
-    position: 'sticky',
+    position: 'fixed',
     top: 0,
+    left: 0,
+    width: 250,
     height: '100vh',
     background: colors.greenDark,
     color: colors.white,
@@ -934,6 +914,7 @@ const s = {
     flexDirection: 'column',
     justifyContent: 'space-between',
     overflow: 'hidden',
+    zIndex: 1000,
     boxShadow: '18px 0 50px rgba(6, 78, 46, 0.13)',
   },
 
@@ -1008,7 +989,7 @@ const s = {
     flexShrink: 0,
   },
 
-  newBtn: {
+  logoutBtn: {
     width: '100%',
     border: 'none',
     background: colors.white,
@@ -1027,25 +1008,13 @@ const s = {
     gap: 8,
   },
 
-  sideSmallBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 9,
-    border: 'none',
-    background: 'transparent',
-    color: 'rgba(255,255,255,0.78)',
-    textAlign: 'left',
-    cursor: 'pointer',
-    fontSize: 12,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    fontWeight: 700,
-  },
-
   main: {
+    minHeight: '100vh',
+    marginLeft: 250,
     padding: '28px 32px',
     background: colors.cream,
     minWidth: 0,
+    overflowX: 'hidden',
   },
 
   header: {
@@ -1054,15 +1023,7 @@ const s = {
     alignItems: 'flex-start',
     gap: 16,
     marginBottom: 22,
-  },
-
-  eyebrow: {
-    color: colors.green,
-    fontWeight: 900,
-    fontSize: 12,
-    letterSpacing: 1.2,
-    marginBottom: 6,
-    textTransform: 'uppercase',
+    minWidth: 0,
   },
 
   title: {
@@ -1072,25 +1033,6 @@ const s = {
     letterSpacing: '-0.8px',
   },
 
-  subtitle: {
-    color: colors.muted,
-    marginTop: 8,
-    lineHeight: 1.7,
-    maxWidth: 760,
-  },
-
-  backBtn: {
-    height: 42,
-    border: `1px solid ${colors.borderStrong}`,
-    background: colors.white,
-    color: colors.greenDark,
-    cursor: 'pointer',
-    padding: '0 14px',
-    fontWeight: 900,
-    borderRadius: 14,
-    boxShadow: '0 10px 24px rgba(6,78,46,0.08)',
-  },
-
   topBar: {
     display: 'flex',
     justifyContent: 'space-between',
@@ -1098,11 +1040,13 @@ const s = {
     gap: 14,
     marginBottom: 18,
     flexWrap: 'wrap',
+    minWidth: 0,
   },
 
   selectBox: {
     display: 'grid',
     gap: 7,
+    minWidth: 0,
   },
 
   topLabel: {
@@ -1139,20 +1083,23 @@ const s = {
 
   layout: {
     display: 'grid',
-    gridTemplateColumns: '1fr 390px',
+    gridTemplateColumns: 'minmax(0, 1fr) minmax(340px, 390px)',
     gap: 18,
     alignItems: 'start',
+    minWidth: 0,
   },
 
   left: {
     display: 'grid',
     gap: 18,
+    minWidth: 0,
   },
 
   right: {
     display: 'grid',
     gap: 18,
     alignContent: 'start',
+    minWidth: 0,
   },
 
   panel: {
@@ -1161,6 +1108,7 @@ const s = {
     padding: 20,
     borderRadius: 24,
     boxShadow: '0 14px 36px rgba(6,78,46,0.08)',
+    minWidth: 0,
   },
 
   panelHeader: {
@@ -1202,6 +1150,7 @@ const s = {
     display: 'grid',
     gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
     gap: 14,
+    minWidth: 0,
   },
 
   nutrientCard: {
@@ -1210,6 +1159,7 @@ const s = {
     padding: 16,
     minHeight: 128,
     borderRadius: 18,
+    minWidth: 0,
   },
 
   nutrientName: {
@@ -1224,6 +1174,7 @@ const s = {
     lineHeight: 1,
     fontWeight: 900,
     color: colors.green,
+    wordBreak: 'break-word',
   },
 
   sourcePill: {
@@ -1253,6 +1204,7 @@ const s = {
     overflow: 'hidden',
     border: `1px solid ${colors.border}`,
     borderRadius: 18,
+    minWidth: 0,
   },
 
   coordBadge: {
@@ -1286,6 +1238,7 @@ const s = {
     gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
     gap: 14,
     marginTop: 14,
+    minWidth: 0,
   },
 
   formGroup: {
@@ -1294,15 +1247,18 @@ const s = {
     color: colors.greenDeep,
     fontSize: 12,
     fontWeight: 900,
+    minWidth: 0,
   },
 
   input: {
+    width: '100%',
     background: colors.cream2,
     border: `1px solid ${colors.border}`,
     color: colors.text,
     padding: '12px 13px',
     outline: 'none',
     borderRadius: 14,
+    minWidth: 0,
   },
 
   actions: {
@@ -1351,7 +1307,7 @@ const s = {
 
   resultGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
+    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
     gap: 10,
     marginBottom: 14,
   },
@@ -1361,6 +1317,7 @@ const s = {
     border: `1px solid ${colors.border}`,
     padding: 12,
     borderRadius: 16,
+    minWidth: 0,
   },
 
   resultLabel: {
@@ -1375,16 +1332,19 @@ const s = {
     fontSize: 28,
     fontWeight: 900,
     marginTop: 8,
+    wordBreak: 'break-word',
   },
 
   tableBox: {
     overflowX: 'auto',
     border: `1px solid ${colors.border}`,
     borderRadius: 16,
+    maxWidth: '100%',
   },
 
   table: {
     width: '100%',
+    minWidth: 520,
     borderCollapse: 'collapse',
   },
 
@@ -1403,7 +1363,7 @@ const s = {
 
   recommendItem: {
     display: 'grid',
-    gridTemplateColumns: '24px 1fr',
+    gridTemplateColumns: '24px minmax(0, 1fr)',
     gap: 10,
     color: colors.text,
     fontSize: 13,
@@ -1502,6 +1462,14 @@ const css = `
     box-sizing: border-box;
   }
 
+  html,
+  body,
+  #root {
+    width: 100%;
+    min-height: 100%;
+    overflow-x: hidden;
+  }
+
   body {
     margin: 0;
     background: ${colors.cream};
@@ -1556,6 +1524,7 @@ const css = `
 
   div::-webkit-scrollbar {
     width: 8px;
+    height: 8px;
   }
 
   div::-webkit-scrollbar-track {
@@ -1583,12 +1552,13 @@ const css = `
   }
 
   @media (max-width: 1180px) {
-    div[style*="grid-template-columns: 250px 1fr"] {
-      grid-template-columns: 1fr !important;
+    .main-analisis {
+      margin-left: 0 !important;
     }
 
-    aside {
+    .sidebar-analisis {
       position: static !important;
+      width: 100% !important;
       height: auto !important;
       min-height: auto !important;
     }
@@ -1597,7 +1567,7 @@ const css = `
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    div[style*="grid-template-columns: 1fr 390px"] {
+    div[style*="grid-template-columns: minmax(0, 1fr) minmax(340px, 390px)"] {
       grid-template-columns: 1fr !important;
     }
 
@@ -1607,10 +1577,6 @@ const css = `
   }
 
   @media (max-width: 760px) {
-    div[style*="justify-content: space-between"] {
-      flex-direction: column;
-    }
-
     input[style],
     select[style] {
       width: 100% !important;
@@ -1620,7 +1586,7 @@ const css = `
   @media (max-width: 650px) {
     div[style*="grid-template-columns: repeat(4, minmax(0, 1fr))"],
     div[style*="grid-template-columns: repeat(2, minmax(0, 1fr))"],
-    div[style*="grid-template-columns: repeat(3, 1fr)"] {
+    div[style*="grid-template-columns: repeat(3, minmax(0, 1fr))"] {
       grid-template-columns: 1fr !important;
     }
   }

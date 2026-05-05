@@ -119,6 +119,16 @@ function distanceMeter(a, b) {
   return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
 }
 
+function getAreaRadius(centerPoint, polygonPoints) {
+  if (!centerPoint || polygonPoints.length === 0) return 0;
+
+  const maxDistance = polygonPoints.reduce((max, point) => {
+    return Math.max(max, distanceMeter(centerPoint, point));
+  }, 0);
+
+  return Math.ceil(maxDistance);
+}
+
 function sortPointsAroundCenter(points, center) {
   if (!center || points.length < 3) return points;
 
@@ -240,11 +250,7 @@ export default function Digitasi({ token, onNavigate }) {
   }, [centerPoint, polygonPoints]);
 
   const maxDistance = useMemo(() => {
-    if (!centerPoint || polygonPoints.length === 0) return 0;
-
-    return polygonPoints.reduce((max, point) => {
-      return Math.max(max, distanceMeter(centerPoint, point));
-    }, 0);
+    return getAreaRadius(centerPoint, polygonPoints);
   }, [centerPoint, polygonPoints]);
 
   const polygonReady = centerPoint && polygonPoints.length >= 2;
@@ -379,6 +385,7 @@ export default function Digitasi({ token, onNavigate }) {
     }
 
     const sortedPolygonForSave = sortPointsAroundCenter(polygonPoints, centerPoint);
+    const ukuranArea = getAreaRadius(centerPoint, polygonPoints);
 
     const payload = {
       jenis: form.jenis,
@@ -390,7 +397,7 @@ export default function Digitasi({ token, onNavigate }) {
       kondisiTanah: '',
       deskripsi: isMasalah ? form.deskripsi : '',
       statusTindakLanjut: isMasalah ? form.statusTindakLanjut : '',
-      radius: MAX_RADIUS,
+      radius: ukuranArea,
       lat: centerPoint.lat,
       lng: centerPoint.lng,
       areaType: 'polygon',
@@ -485,8 +492,8 @@ export default function Digitasi({ token, onNavigate }) {
           <div style={s.kicker}>DIGITASI LAHAN</div>
           <h1 style={s.title}>Digitasi Area Lahan</h1>
           <p style={s.subtitle}>
-            Titik pertama menjadi acuan radius 100 meter. Tambahkan titik berikutnya
-            untuk membentuk polygon area lahan.
+            Titik pertama menjadi acuan batas maksimal 100 meter. Ukuran area yang tersimpan
+            mengikuti jarak titik terjauh dari Titik 1.
           </p>
         </div>
 
@@ -523,7 +530,7 @@ export default function Digitasi({ token, onNavigate }) {
             <div style={s.notice}>
               {!centerPoint
                 ? 'Klik peta atau input koordinat manual untuk membuat Titik 1.'
-                : `Titik 1 sudah dibuat. Tambahkan minimal 2 titik berikutnya dalam radius ${MAX_RADIUS} meter dari Titik 1.`}
+                : `Titik 1 sudah dibuat. Tambahkan minimal 2 titik berikutnya dalam batas maksimal ${MAX_RADIUS} meter dari Titik 1.`}
             </div>
 
             <form onSubmit={submit}>
@@ -668,8 +675,8 @@ export default function Digitasi({ token, onNavigate }) {
                 <div>Total titik area: {allDraftPoints.length}</div>
                 <div>Titik tambahan: {polygonPoints.length}</div>
                 <div>Minimal total titik: 3</div>
-                <div>Batas radius: {MAX_RADIUS} meter dari Titik 1</div>
-                <div>Jarak terjauh dari Titik 1: {maxDistance.toFixed(2)} meter</div>
+                <div>Batas maksimal input: {MAX_RADIUS} meter dari Titik 1</div>
+                <div>Ukuran area sementara: {maxDistance} meter</div>
                 <div>Status: {polygonReady ? 'Polygon siap disimpan' : 'Belum cukup titik'}</div>
               </div>
 
@@ -784,7 +791,7 @@ export default function Digitasi({ token, onNavigate }) {
                             <br />
                             Jumlah titik area: {totalPointCount}
                             <br />
-                            Radius input: {point.radius || MAX_RADIUS} m
+                            Ukuran area: {point.radius || 0} m
                           </div>
                         </Popup>
                       </Marker>
@@ -813,7 +820,7 @@ export default function Digitasi({ token, onNavigate }) {
                     <Popup>
                       <strong>Titik 1</strong>
                       <br />
-                      Pusat radius {MAX_RADIUS} meter
+                      Batas maksimal {MAX_RADIUS} meter
                       <br />
                       {centerPoint.lat.toFixed(6)}, {centerPoint.lng.toFixed(6)}
                     </Popup>
@@ -912,7 +919,7 @@ export default function Digitasi({ token, onNavigate }) {
                       </div>
 
                       <div style={s.infoText}>
-                        <strong>Radius input:</strong> {point.radius || MAX_RADIUS} m
+                        <strong>Ukuran area:</strong> {point.radius || 0} m
                       </div>
 
                       <div style={s.areaActions}>

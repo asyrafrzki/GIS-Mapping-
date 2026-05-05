@@ -29,10 +29,10 @@ function normalizePolygonPoints(value) {
 function distanceMeter(a, b) {
   const R = 6371000;
 
-  const lat1 = Number(a.lat) * Math.PI / 180;
-  const lat2 = Number(b.lat) * Math.PI / 180;
-  const dLat = (Number(b.lat) - Number(a.lat)) * Math.PI / 180;
-  const dLng = (Number(b.lng) - Number(a.lng)) * Math.PI / 180;
+  const lat1 = (Number(a.lat) * Math.PI) / 180;
+  const lat2 = (Number(b.lat) * Math.PI) / 180;
+  const dLat = ((Number(b.lat) - Number(a.lat)) * Math.PI) / 180;
+  const dLng = ((Number(b.lng) - Number(a.lng)) * Math.PI) / 180;
 
   const x =
     Math.sin(dLat / 2) ** 2 +
@@ -86,7 +86,9 @@ export async function getMyPoints(req, res) {
     return res.json(result.rows);
   } catch (err) {
     console.error('getMyPoints error:', err);
-    return res.status(500).json({ message: 'Gagal mengambil data titik.' });
+    return res.status(500).json({
+      message: 'Gagal mengambil data titik.',
+    });
   }
 }
 
@@ -129,7 +131,7 @@ export async function createPoint(req, res) {
     let finalAreaType = areaType || 'point';
     let finalLat = Number(lat);
     let finalLng = Number(lng);
-    let finalRadius = Number(radius) || MAX_RADIUS_METER;
+    let finalRadius = Number(radius) || 0;
 
     if (!Number.isFinite(finalLat) || !Number.isFinite(finalLng)) {
       return res.status(400).json({
@@ -139,10 +141,10 @@ export async function createPoint(req, res) {
 
     if (normalizedPolygon.length > 0) {
       if (normalizedPolygon.length < 2) {
-  return res.status(400).json({
-    message: 'Minimal total 3 titik diperlukan untuk membentuk polygon.',
-  });
-}
+        return res.status(400).json({
+          message: 'Minimal total 3 titik diperlukan untuk membentuk polygon.',
+        });
+      }
 
       const centerPoint = {
         lat: finalLat,
@@ -155,13 +157,12 @@ export async function createPoint(req, res) {
         });
       }
 
-      finalRadius = MAX_RADIUS_METER;
       finalAreaType = 'polygon';
     }
 
     if (finalRadius > MAX_RADIUS_METER) {
       return res.status(400).json({
-        message: `Radius maksimal ${MAX_RADIUS_METER} meter.`,
+        message: `Ukuran area maksimal ${MAX_RADIUS_METER} meter.`,
       });
     }
 
@@ -213,7 +214,9 @@ export async function createPoint(req, res) {
     return res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error('createPoint error:', err);
-    return res.status(500).json({ message: 'Gagal menyimpan titik.' });
+    return res.status(500).json({
+      message: 'Gagal menyimpan titik.',
+    });
   }
 }
 
@@ -273,7 +276,7 @@ export async function updatePoint(req, res) {
     let finalAreaType = areaType || 'point';
     let finalLat = Number(lat);
     let finalLng = Number(lng);
-    let finalRadius = Number(radius) || MAX_RADIUS_METER;
+    let finalRadius = Number(radius) || 0;
 
     if (!Number.isFinite(finalLat) || !Number.isFinite(finalLng)) {
       return res.status(400).json({
@@ -282,9 +285,9 @@ export async function updatePoint(req, res) {
     }
 
     if (normalizedPolygon.length > 0) {
-      if (normalizedPolygon.length < 3) {
+      if (normalizedPolygon.length < 2) {
         return res.status(400).json({
-          message: 'Minimal harus ada 3 titik tambahan untuk membentuk polygon.',
+          message: 'Minimal total 3 titik diperlukan untuk membentuk polygon.',
         });
       }
 
@@ -299,13 +302,12 @@ export async function updatePoint(req, res) {
         });
       }
 
-      finalRadius = MAX_RADIUS_METER;
       finalAreaType = 'polygon';
     }
 
     if (finalRadius > MAX_RADIUS_METER) {
       return res.status(400).json({
-        message: `Radius maksimal ${MAX_RADIUS_METER} meter.`,
+        message: `Ukuran area maksimal ${MAX_RADIUS_METER} meter.`,
       });
     }
 
@@ -354,7 +356,9 @@ export async function updatePoint(req, res) {
     return res.json(result.rows[0]);
   } catch (err) {
     console.error('updatePoint error:', err);
-    return res.status(500).json({ message: 'Gagal mengubah titik.' });
+    return res.status(500).json({
+      message: 'Gagal mengubah titik.',
+    });
   }
 }
 
@@ -382,7 +386,9 @@ export async function deletePoint(req, res) {
     });
   } catch (err) {
     console.error('deletePoint error:', err);
-    return res.status(500).json({ message: 'Gagal menghapus titik.' });
+    return res.status(500).json({
+      message: 'Gagal menghapus titik.',
+    });
   }
 }
 

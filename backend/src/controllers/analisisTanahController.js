@@ -5,17 +5,21 @@ import { getNutrientContextForPoint } from '../utils/nutrientGeojsonService.js';
 export async function getMyPoints(req, res) {
   try {
     const result = await pool.query(
-      `SELECT id, nama, lokasi, daerah, lat, lng, radius
-       FROM field_points
-       WHERE user_id = $1
-       ORDER BY created_at DESC`,
+      `
+      SELECT id, nama, lokasi, daerah, lat, lng, radius
+      FROM field_points
+      WHERE user_id = $1
+      ORDER BY created_at DESC
+      `,
       [req.user.id]
     );
 
     return res.json(result.rows);
   } catch (err) {
     console.error('getMyPoints error:', err);
-    return res.status(500).json({ message: 'Gagal mengambil titik lahan.' });
+    return res.status(500).json({
+      message: 'Gagal mengambil titik lahan.',
+    });
   }
 }
 
@@ -24,28 +28,33 @@ export async function getPointContext(req, res) {
     const { pointId } = req.params;
 
     const pointResult = await pool.query(
-      `SELECT id, nama, lokasi, daerah, lat, lng, radius
-       FROM field_points
-       WHERE id = $1 AND user_id = $2
-       LIMIT 1`,
+      `
+      SELECT id, nama, lokasi, daerah, lat, lng, radius
+      FROM field_points
+      WHERE id = $1 AND user_id = $2
+      LIMIT 1
+      `,
       [pointId, req.user.id]
     );
 
     if (pointResult.rows.length === 0) {
-      return res.status(404).json({ message: 'Titik tidak ditemukan.' });
+      return res.status(404).json({
+        message: 'Titik tidak ditemukan.',
+      });
     }
 
     const point = pointResult.rows[0];
     const radius = Math.min(Number(point.radius || 100), 100);
-
     const nutrients = await getNutrientContextForPoint(point.lat, point.lng);
 
     const latestResult = await pool.query(
-      `SELECT *
-       FROM soil_analysis_results
-       WHERE user_id = $1 AND point_id = $2
-       ORDER BY created_at DESC
-       LIMIT 1`,
+      `
+      SELECT *
+      FROM soil_analysis_results
+      WHERE user_id = $1 AND point_id = $2
+      ORDER BY created_at DESC
+      LIMIT 1
+      `,
       [req.user.id, pointId]
     );
 
@@ -59,7 +68,9 @@ export async function getPointContext(req, res) {
     });
   } catch (err) {
     console.error('getPointContext error:', err);
-    return res.status(500).json({ message: 'Gagal mengambil konteks titik.' });
+    return res.status(500).json({
+      message: 'Gagal mengambil konteks titik.',
+    });
   }
 }
 
@@ -69,35 +80,34 @@ export async function calculateOnly(req, res) {
     return res.json(result);
   } catch (err) {
     console.error('calculateOnly error:', err);
-    return res.status(400).json({ message: err.message || 'Gagal menghitung analisis tanah.' });
+    return res.status(400).json({
+      message: err.message || 'Gagal menghitung analisis tanah.',
+    });
   }
 }
 
 export async function saveAnalysis(req, res) {
   try {
-    const {
-      pointId,
-      umur,
-      luas,
-      protas,
-      jumlahPohon,
-    } = req.body;
+    const { pointId, umur, luas, protas, jumlahPohon } = req.body;
 
     const pointResult = await pool.query(
-      `SELECT id, nama, lokasi, daerah, lat, lng, radius
-       FROM field_points
-       WHERE id = $1 AND user_id = $2
-       LIMIT 1`,
+      `
+      SELECT id, nama, lokasi, daerah, lat, lng, radius
+      FROM field_points
+      WHERE id = $1 AND user_id = $2
+      LIMIT 1
+      `,
       [pointId, req.user.id]
     );
 
     if (pointResult.rows.length === 0) {
-      return res.status(404).json({ message: 'Titik tidak ditemukan.' });
+      return res.status(404).json({
+        message: 'Titik tidak ditemukan.',
+      });
     }
 
     const point = pointResult.rows[0];
     const radius = Math.min(Number(point.radius || 100), 100);
-
     const nutrients = await getNutrientContextForPoint(point.lat, point.lng);
 
     const result = calculateSoilAnalysis({
@@ -112,7 +122,8 @@ export async function saveAnalysis(req, res) {
     });
 
     const saved = await pool.query(
-      `INSERT INTO soil_analysis_results (
+      `
+      INSERT INTO soil_analysis_results (
         user_id, point_id, point_name, lokasi, daerah, radius,
         n, p, k, mg,
         n_source, p_source, k_source, mg_source,
@@ -124,7 +135,8 @@ export async function saveAnalysis(req, res) {
         urea_akhir, tsp_akhir, kcl_akhir, dolomit_akhir,
         urea_app1, tsp_app1, kcl_app1, dolomit_app1,
         urea_app2, tsp_app2, kcl_app2, dolomit_app2,
-        aplikasi1_total, aplikasi2_total, total_rekomendasi
+        aplikasi1_total, aplikasi2_total, total_rekomendasi,
+        admin_note
       )
       VALUES (
         $1,$2,$3,$4,$5,$6,
@@ -138,9 +150,11 @@ export async function saveAnalysis(req, res) {
         $33,$34,$35,$36,
         $37,$38,$39,$40,
         $41,$42,$43,$44,
-        $45,$46,$47
+        $45,$46,$47,
+        $48
       )
-      RETURNING *`,
+      RETURNING *
+      `,
       [
         req.user.id,
         point.id,
@@ -148,47 +162,60 @@ export async function saveAnalysis(req, res) {
         point.lokasi,
         point.daerah,
         radius,
+
         result.input.n,
         result.input.p,
         result.input.k,
         result.input.mg,
+
         nutrients.sources.n,
         nutrients.sources.p,
         nutrients.sources.k,
         nutrients.sources.mg,
+
         result.input.umur,
         result.input.luas,
         result.input.protas,
         result.input.jumlahPohon,
+
         result.produksi,
         result.prodPerPohon,
+
         result.prod_n,
         result.prod_p,
         result.prod_k,
         result.prod_mg,
+
         result.bio_n,
         result.bio_p,
         result.bio_k,
         result.bio_mg,
+
         result.urea_awal,
         result.tsp_awal,
         result.kcl_awal,
         result.dolomit_awal,
+
         result.urea_akhir,
         result.tsp_akhir,
         result.kcl_akhir,
         result.dolomit_akhir,
+
         result.aplikasi1.urea,
         result.aplikasi1.tsp,
         result.aplikasi1.kcl,
         result.aplikasi1.dolomit,
+
         result.aplikasi2.urea,
         result.aplikasi2.tsp,
         result.aplikasi2.kcl,
         result.aplikasi2.dolomit,
+
         result.summary.aplikasi1_total,
         result.summary.aplikasi2_total,
         result.summary.total_rekomendasi,
+
+        '',
       ]
     );
 
@@ -199,27 +226,144 @@ export async function saveAnalysis(req, res) {
     });
   } catch (err) {
     console.error('saveAnalysis error:', err);
-    return res.status(400).json({ message: err.message || 'Gagal menyimpan analisis.' });
+    return res.status(400).json({
+      message: err.message || 'Gagal menyimpan analisis.',
+    });
   }
 }
 
 export async function getHistory(req, res) {
   try {
     const result = await pool.query(
-      `SELECT
+      `
+      SELECT
         sar.*,
         fp.lat,
-        fp.lng
-       FROM soil_analysis_results sar
-       JOIN field_points fp ON fp.id = sar.point_id
-       WHERE sar.user_id = $1
-       ORDER BY sar.created_at DESC`,
+        fp.lng,
+        fp.tanah_user
+      FROM soil_analysis_results sar
+      JOIN field_points fp ON fp.id = sar.point_id
+      WHERE sar.user_id = $1
+      ORDER BY sar.created_at DESC
+      `,
       [req.user.id]
     );
 
     return res.json(result.rows);
   } catch (err) {
     console.error('getHistory error:', err);
-    return res.status(500).json({ message: 'Gagal mengambil riwayat analisis.' });
+    return res.status(500).json({
+      message: 'Gagal mengambil riwayat analisis.',
+    });
+  }
+}
+
+export async function getAdminSoilAnalyses(req, res) {
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+        fp.id AS point_id,
+        fp.user_id,
+        fp.nama AS point_name,
+        fp.tanah_user,
+        fp.lokasi,
+        fp.daerah,
+        fp.radius,
+        fp.lat,
+        fp.lng,
+        fp.polygon_points,
+        fp.area_type,
+        fp.created_at AS point_created_at,
+
+        u.name AS user_name,
+        u.email AS user_email,
+
+        sar.id AS analysis_id,
+        sar.umur,
+        sar.luas,
+        sar.protas,
+        sar.jumlah_pohon,
+
+        sar.n,
+        sar.p,
+        sar.k,
+        sar.mg,
+
+        sar.n_source,
+        sar.p_source,
+        sar.k_source,
+        sar.mg_source,
+
+        sar.urea_app1,
+        sar.tsp_app1,
+        sar.kcl_app1,
+        sar.dolomit_app1,
+
+        sar.urea_app2,
+        sar.tsp_app2,
+        sar.kcl_app2,
+        sar.dolomit_app2,
+
+        sar.aplikasi1_total,
+        sar.aplikasi2_total,
+        sar.total_rekomendasi,
+        sar.admin_note,
+        sar.created_at AS analysis_created_at
+
+      FROM field_points fp
+      JOIN users u ON u.id = fp.user_id
+
+      LEFT JOIN LATERAL (
+        SELECT *
+        FROM soil_analysis_results sar
+        WHERE sar.point_id = fp.id
+        ORDER BY sar.created_at DESC
+        LIMIT 1
+      ) sar ON true
+
+      ORDER BY fp.created_at DESC
+      `
+    );
+
+    return res.json(result.rows);
+  } catch (err) {
+    console.error('getAdminSoilAnalyses error:', err);
+    return res.status(500).json({
+      message: 'Gagal mengambil data tanah user.',
+    });
+  }
+}
+
+export async function updateAdminRecommendation(req, res) {
+  try {
+    const { id } = req.params;
+    const { adminNote } = req.body;
+
+    const result = await pool.query(
+      `
+      UPDATE soil_analysis_results
+      SET admin_note = $1
+      WHERE id = $2
+      RETURNING *
+      `,
+      [adminNote || '', id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        message: 'Data analisis tanah tidak ditemukan. Tanah ini belum punya hasil analisis.',
+      });
+    }
+
+    return res.json({
+      message: 'Rekomendasi admin berhasil disimpan.',
+      data: result.rows[0],
+    });
+  } catch (err) {
+    console.error('updateAdminRecommendation error:', err);
+    return res.status(500).json({
+      message: 'Gagal menyimpan rekomendasi admin.',
+    });
   }
 }

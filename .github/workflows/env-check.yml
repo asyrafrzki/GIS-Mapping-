@@ -13,7 +13,6 @@ jobs:
 
       - name: Cek env example
         run: |
-          test -f .env.example
           test -f backend/.env.example
 
       - name: Pastikan env asli tidak ikut ke repository

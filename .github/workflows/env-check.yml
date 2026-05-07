@@ -1,0 +1,29 @@
+name: Env Example Check
+
+on: [workflow_dispatch]
+
+jobs:
+  check-env-example:
+    name: Check Env Example Files
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ambil kode repository
+        uses: actions/checkout@v6
+
+      - name: Cek env example
+        run: |
+          test -f .env.example
+          test -f backend/.env.example
+
+      - name: Pastikan env asli tidak ikut ke repository
+        run: |
+          if [ -f .env ]; then
+            echo ".env tidak boleh masuk repository"
+            exit 1
+          fi
+
+          if [ -f backend/.env ]; then
+            echo "backend/.env tidak boleh masuk repository"
+            exit 1
+          fi

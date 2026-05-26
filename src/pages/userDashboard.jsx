@@ -116,12 +116,6 @@ export default function UserDashboard({ token, currentUser, onNavigate, onLogout
             />
 
             <NavItem
-              label="Laporan"
-              icon={ICONS.laporan}
-              onClick={() => onNavigate('laporan')}
-            />
-
-            <NavItem
               label="Analisis Tanah"
               icon={ICONS.analisis}
               onClick={() => onNavigate('analisis-tanah')}

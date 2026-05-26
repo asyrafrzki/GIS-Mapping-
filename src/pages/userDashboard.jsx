@@ -17,7 +17,7 @@ const colors = {
   danger: '#b91c1c',
 };
 
-const LOGO_SRC = '/ppks.png';
+const LOGO_SRC = '/logo.png';
 
 const ICONS = {
   dashboard: 'https://cdn.jsdelivr.net/npm/lucide-static@0.468.0/icons/layout-dashboard.svg',
